@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>トレース表エディタ</title>
+<style>
+:root{
+  --bg:#f3f4f2; --panel:#ffffff; --ink:#1f2328; --muted:#6a7078; --line:#d3d7dc;
+  --accent:#1f5fbf; --accent-ink:#ffffff; --accent-soft:#e9f0fb;
+  --marker:#fff2a8; --marker-ink:#4d3f00;
+  --code-bg:#f6f7f9; --danger:#b3261e; --focus:#1f5fbf;
+  --radius:6px;
+  --font:"Segoe UI","Yu Gothic UI","Meiryo","Hiragino Sans",system-ui,sans-serif;
+  --mono:Consolas,"Cascadia Mono","BIZ UDGothic","MS Gothic",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#151719; --panel:#1d2024; --ink:#e4e7ea; --muted:#9aa3ad; --line:#353b43;
+    --accent:#6fa0ff; --accent-ink:#0f1a2e; --accent-soft:#202b3f;
+    --marker:#4a3f0e; --marker-ink:#ffe680;
+    --code-bg:#17191c; --danger:#ff7b72; --focus:#6fa0ff;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151719; --panel:#1d2024; --ink:#e4e7ea; --muted:#9aa3ad; --line:#353b43;
+  --accent:#6fa0ff; --accent-ink:#0f1a2e; --accent-soft:#202b3f;
+  --marker:#4a3f0e; --marker-ink:#ffe680;
+  --code-bg:#17191c; --danger:#ff7b72; --focus:#6fa0ff;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5}
+button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:4px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:default;border-color:var(--line)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.danger{color:var(--danger)}
+button.small{padding:1px 6px;font-size:12px;line-height:1.4}
+input[type=text],textarea,select{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:5px 8px}
+input[type=text]:focus,textarea:focus,select:focus,button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.muted{color:var(--muted)}
+.hint{color:var(--muted);font-size:12px;margin:6px 0 0}
+.hint kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 4px;background:var(--code-bg)}
+
+.topbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{font-weight:700;font-size:15px;white-space:nowrap}
+#title{flex:1 1 240px;min-width:180px}
+.docs,.actions{display:flex;gap:6px;align-items:center}
+#docSelect{max-width:220px}
+
+.layout{display:grid;grid-template-columns:minmax(280px,36%) 1fr;gap:12px;padding:12px 14px}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;min-width:0}
+.pane-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.pane-head h2{font-size:14px;margin:0 6px 0 0}
+.spacer{flex:1}
+
+#codeInput{width:100%;min-height:150px;font-family:var(--mono);font-size:13px;line-height:1.5;tab-size:4;white-space:pre;resize:vertical;background:var(--code-bg)}
+#codeLines{list-style:none;margin:8px 0 0;padding:0;border:1px solid var(--line);border-radius:var(--radius);background:var(--code-bg);font-family:var(--mono);font-size:13px;overflow:auto;max-height:calc(100vh - 300px)}
+#codeLines li{display:flex;gap:10px;padding:1px 8px 1px 0;cursor:pointer;white-space:pre;border-left:3px solid transparent}
+#codeLines li:hover{background:var(--accent-soft)}
+#codeLines li.active{background:var(--accent-soft);border-left-color:var(--accent)}
+#codeLines li.empty{cursor:default;white-space:normal;color:var(--muted);padding:10px;font-family:var(--font)}
+#codeLines .ln{min-width:2.6em;text-align:right;color:var(--muted);user-select:none;padding-left:6px}
+#codeLines code{font:inherit}
+
+.varbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+#varChips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:2px;border:1px solid var(--line);border-radius:999px;padding:2px 4px 2px 10px;background:var(--code-bg)}
+.chip-name{font-family:var(--mono);font-weight:600;cursor:text;padding-right:4px}
+.chip input{font-family:var(--mono);width:7em;padding:0 4px;border-radius:4px}
+.chip button{border:0;background:transparent;padding:0 4px;font-size:11px;color:var(--muted);border-radius:999px}
+.chip button:hover{color:var(--ink);background:var(--panel)}
+#newVar{width:15em;font-family:var(--mono)}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.controls label{display:inline-flex;align-items:center;gap:4px;font-size:13px;white-space:nowrap}
+
+#activeCode{font-family:var(--mono);font-size:12px;color:var(--muted);margin:0 0 6px;min-height:1.4em;white-space:pre;overflow:hidden;text-overflow:ellipsis}
+#activeCode b{color:var(--accent);font-weight:600}
+
+.table-wrap{overflow:auto;max-height:calc(100vh - 260px);border:1px solid var(--line);border-radius:var(--radius)}
+#trace{border-collapse:separate;border-spacing:0;width:100%;min-width:max-content}
+#trace th{position:sticky;top:0;z-index:1;background:var(--code-bg);border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:6px 8px;text-align:left;font-weight:600;white-space:nowrap}
+#trace th.c-var{font-family:var(--mono)}
+#trace td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:0;vertical-align:middle}
+#trace th:last-child,#trace td:last-child{border-right:0}
+#trace tr:last-child td{border-bottom:0}
+#trace td.c-num{padding:0 8px;color:var(--muted);text-align:right;background:var(--code-bg);width:2.5em}
+#trace tr.active td{background:var(--accent-soft)}
+#trace tr.active td.c-num{background:var(--accent-soft);color:var(--accent);font-weight:600}
+#trace td input{width:100%;min-width:4em;border:0;border-radius:0;background:transparent;padding:5px 8px;font-family:var(--mono);font-size:13px}
+#trace td.c-line input{width:4.5em;text-align:center}
+#trace td.c-out input{min-width:9em}
+#trace td.c-note input{min-width:14em;font-family:var(--font)}
+#trace td input:focus{outline:2px solid var(--focus);outline-offset:-2px;position:relative;z-index:2}
+#trace td.changed{background:var(--marker)}
+#trace td.changed input{color:var(--marker-ink);font-weight:600}
+#trace tr.active td.changed{background:var(--marker)}
+#trace td.c-ops{white-space:nowrap;padding:0 6px}
+#trace td.c-ops button{border:0;background:transparent;padding:2px 5px;color:var(--muted);font-size:12px}
+#trace td.c-ops button:hover{color:var(--ink);background:var(--code-bg);border-radius:4px}
+#trace td.c-ops button.danger:hover{color:var(--danger)}
+#emptyRows{padding:22px 12px;text-align:center;color:var(--muted)}
+
+dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;width:min(720px,92vw);max-height:90vh}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog h3{margin:0 0 10px;font-size:15px}
+.dlg-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.dlg-row label{display:inline-flex;align-items:center;gap:4px}
+dialog textarea{width:100%;min-height:260px;font-family:var(--mono);font-size:12px;white-space:pre;resize:vertical;background:var(--code-bg)}
+.dlg-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
+
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .15s}
+#toast.show{opacity:1}
+@media (prefers-reduced-motion: reduce){#toast{transition:none}}
+
+@media print{
+  body{background:#fff;color:#000;font-size:11pt}
+  .topbar{border:0;padding:0 0 8px}
+  .brand,.docs,.actions,#codeInput,#toggleCodeEdit,#extractVars,.varbar,.controls,.hint,.c-ops,#emptyRows,#toast,.pane-head button{display:none!important}
+  #title{border:0;padding:0;font-size:15pt;font-weight:700;background:transparent;color:#000;width:100%}
+  .layout{display:block;padding:0}
+  .pane{border:0;padding:0;margin-bottom:12px;background:transparent}
+  #codeLines{max-height:none;overflow:visible;border:1px solid #000;background:#fff;color:#000}
+  #codeLines li{cursor:default;border-left:0;background:transparent!important}
+  #codeLines .ln{color:#555}
+  #activeCode{display:none}
+  .table-wrap{max-height:none;overflow:visible;border:0}
+  #trace{min-width:0}
+  #trace th,#trace td{border:1px solid #000!important;background:#fff!important;color:#000}
+  #trace th{position:static}
+  #trace td.changed{background:#e8e8e8!important}
+  #trace td input{color:#000!important}
+  #trace tr.active td{background:#fff!important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">トレース表エディタ</div>
+  <input type="text" id="title" placeholder="問題名（例: 令和6年 科目B 問3 / Java 演習 5）" aria-label="問題名">
+  <div class="docs">
+    <select id="docSelect" aria-label="保存済みのトレース表"></select>
+    <button id="newDoc" title="空のトレース表を作る">新規</button>
+    <button id="dupDoc" title="このトレース表を複製する">複製</button>
+    <button id="delDoc" class="danger" title="このトレース表を削除する">削除</button>
+  </div>
+  <div class="actions">
+    <button id="btnImport">読み込み</button>
+    <button id="btnExport" class="primary">書き出し</button>
+    <button id="btnPrint" title="印刷 / PDF保存">印刷</button>
+    <button id="btnTheme" title="テーマ切り替え">🌗</button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="pane code-pane">
+    <div class="pane-head">
+      <h2>コード</h2>
+      <button id="toggleCodeEdit" class="small">編集欄を閉じる</button>
+      <button id="extractVars" class="small" title="宣言文から変数名を取り出して列に追加">変数を抽出</button>
+    </div>
+    <textarea id="codeInput" placeholder="ここに Java や擬似言語のコードを貼り付け（Tab でインデント）" spellcheck="false"></textarea>
+    <ol id="codeLines"></ol>
+    <p class="hint">行をクリックすると、選択中の行の下にその行番号のステップが追加されます。</p>
+  </section>
+
+  <section class="pane table-pane">
+    <div class="pane-head">
+      <h2>トレース表</h2>
+      <span class="spacer"></span>
+      <button id="addRow" class="primary small">＋ 行を追加</button>
+      <button id="undo" class="small" disabled title="行・列の操作を元に戻す">元に戻す</button>
+      <button id="clearRows" class="small danger">表をクリア</button>
+    </div>
+    <div class="varbar">
+      <span>変数</span>
+      <div id="varChips"></div>
+      <input type="text" id="newVar" placeholder="変数名を追加（Enter / カンマ区切り可）" aria-label="変数名を追加">
+    </div>
+    <div class="controls">
+      <label><input type="checkbox" id="copyPrev" checked> 行の追加時に前の行の値をコピー</label>
+      <label><input type="checkbox" id="hilite" checked> 変化したセルを強調</label>
+    </div>
+    <p id="activeCode"></p>
+    <div class="table-wrap">
+      <table id="trace"></table>
+      <div id="emptyRows" hidden>まだ行がありません。左のコード行をクリックするか、「＋ 行を追加」で始めてください。</div>
+    </div>
+    <p class="hint">
+      <kbd>Enter</kbd> 下へ（最終行なら新しい行）　<kbd>Shift+Enter</kbd> 上へ　<kbd>Ctrl+Enter</kbd> 下に行を挿入　<kbd>Ctrl+D</kbd> 上のセルをコピー　<kbd>Alt+↑↓</kbd> 行を移動　<kbd>Tab</kbd> 右へ
+    </p>
+  </section>
+</main>
+
+<dialog id="dlgExport">
+  <h3>書き出し</h3>
+  <div class="dlg-row" id="exportFormats">
+    <label><input type="radio" name="fmt" value="md" checked> Markdown（Obsidian / メモ用）</label>
+    <label><input type="radio" name="fmt" value="tsv"> TSV（Excel / Word に貼り付け）</label>
+    <label><input type="radio" name="fmt" value="csv"> CSV</label>
+    <label><input type="radio" name="fmt" value="json"> JSON（このアプリで再読み込み用）</label>
+  </div>
+  <textarea id="exportText" readonly></textarea>
+  <div class="dlg-actions">
+    <button id="exportCopy" class="primary">コピー</button>
+    <button id="exportSave">ファイルとして保存</button>
+    <button id="exportClose">閉じる</button>
+  </div>
+</dialog>
+
+<dialog id="dlgImport">
+  <h3>読み込み</h3>
+  <div class="dlg-row">
+    <input type="file" id="importFile" accept=".json,application/json">
+    <span class="muted">または下に JSON を貼り付け</span>
+  </div>
+  <textarea id="importText" placeholder='{"format":"trace-table/v1", ...}'></textarea>
+  <div class="dlg-actions">
+    <button id="importRun" class="primary">読み込む</button>
+    <button id="importClose">閉じる</button>
+  </div>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+const STORAGE_KEY = 'traceTableEditor.v1';
+const THEME_KEY = 'traceTableEditor.theme';
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-3);
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+let state = { docs: [], currentId: null };
+let undoStack = [];
+let activeRow = -1;
+let saveTimer = null;
+let toastTimer = null;
+let confirmTimers = {};
+
+/* ---------- データ ---------- */
+function newDoc(title = '', code = '') {
+  return { id: uid(), title, code, vars: [], rows: [], updated: Date.now() };
+}
+function cur() { return state.docs.find(d => d.id === state.currentId); }
+
+function sampleDoc() {
+  const d = newDoc('サンプル: 1〜3の合計',
+    'int sum = 0;\nfor (int i = 1; i <= 3; i++) {\n    sum = sum + i;\n}\nSystem.out.println(sum);');
+  const vSum = { id: uid(), name: 'sum' }, vI = { id: uid(), name: 'i' };
+  d.vars = [vSum, vI];
+  const row = (line, sum, i, out = '', note = '') => ({ line, vals: { [vSum.id]: sum, [vI.id]: i }, out, note });
+  d.rows = [
+    row('1', '0', ''),
+    row('2', '0', '1', '', 'i=1、条件 i<=3 は真'),
+    row('3', '1', '1'),
+    row('2', '1', '2', '', 'i++ → 2、条件 真'),
+    row('3', '3', '2'),
+    row('2', '3', '3', '', 'i++ → 3、条件 真'),
+    row('3', '6', '3'),
+    row('2', '6', '4', '', 'i++ → 4、条件 偽 → ループ終了'),
+    row('5', '6', '4', '6'),
+  ];
+  return d;
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s && Array.isArray(s.docs) && s.docs.length) {
+        state = s;
+        if (!cur()) state.currentId = state.docs[0].id;
+        return;
+      }
+    }
+  } catch (e) { /* 保存領域が使えない環境ではメモリ上だけで動作 */ }
+  const d = sampleDoc();
+  state = { docs: [d], currentId: d.id };
+}
+function save() {
+  const d = cur(); if (d) d.updated = Date.now();
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+}
+function scheduleSave() { clearTimeout(saveTimer); saveTimer = setTimeout(save, 300); }
+
+function getVal(row, key) {
+  if (key === 'line') return row.line;
+  if (key === 'out') return row.out;
+  if (key === 'note') return row.note;
+  return row.vals[key] ?? '';
+}
+function setVal(row, key, val) {
+  if (key === 'line') row.line = val;
+  else if (key === 'out') row.out = val;
+  else if (key === 'note') row.note = val;
+  else row.vals[key] = val;
+}
+
+/* ---------- 元に戻す ---------- */
+function pushUndo() {
+  const d = cur();
+  undoStack.push(JSON.stringify({ vars: d.vars, rows: d.rows }));
+  if (undoStack.length > 60) undoStack.shift();
+  $('#undo').disabled = false;
+}
+function undo() {
+  if (!undoStack.length) return;
+  const snap = JSON.parse(undoStack.pop());
+  const d = cur(); d.vars = snap.vars; d.rows = snap.rows;
+  if (activeRow >= d.rows.length) activeRow = d.rows.length - 1;
+  renderVars(); renderTable(); scheduleSave();
+  $('#undo').disabled = !undoStack.length;
+  toast('元に戻しました');
+}
+
+/* ---------- 描画 ---------- */
+function renderAll() { renderDocSelect(); renderCode(); renderVars(); renderTable(); }
+
+function renderDocSelect() {
+  const sel = $('#docSelect'); sel.innerHTML = '';
+  state.docs.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d.id; o.textContent = d.title || '（無題）';
+    sel.appendChild(o);
+  });
+  sel.value = state.currentId;
+  $('#title').value = cur().title;
+}
+
+function codeLinesArr() { return cur().code.split('\n'); }
+
+function renderCode() {
+  const d = cur();
+  const ta = $('#codeInput');
+  if (ta.value !== d.code) ta.value = d.code;
+  const ol = $('#codeLines'); ol.innerHTML = '';
+  if (d.code.trim() === '') {
+    const li = document.createElement('li'); li.className = 'empty';
+    li.textContent = 'コードを貼り付けると、ここに行番号付きで表示されます。';
+    ol.appendChild(li); return;
+  }
+  codeLinesArr().forEach((text, i) => {
+    const li = document.createElement('li'); li.dataset.line = String(i + 1);
+    const n = document.createElement('span'); n.className = 'ln'; n.textContent = i + 1;
+    const c = document.createElement('code'); c.textContent = text || ' ';
+    li.append(n, c);
+    li.title = '行 ' + (i + 1) + ' のステップを追加';
+    li.addEventListener('click', () => addRow({ line: String(i + 1) }, null, 'firstVar'));
+    ol.appendChild(li);
+  });
+  updateActiveLine();
+}
+
+function btn(label, title, onClick) {
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.title = title;
+  b.addEventListener('click', onClick); return b;
+}
+
+function renderVars() {
+  const box = $('#varChips'); box.innerHTML = '';
+  const d = cur();
+  if (!d.vars.length) {
+    const s = document.createElement('span'); s.className = 'muted';
+    s.textContent = 'まだ変数がありません。右の欄に入力するか「変数を抽出」を押してください。';
+    box.appendChild(s);
+  }
+  d.vars.forEach((v, i) => {
+    const chip = document.createElement('span'); chip.className = 'chip';
+    const name = document.createElement('span'); name.className = 'chip-name'; name.textContent = v.name;
+    name.title = 'ダブルクリックで名前を変更';
+    name.addEventListener('dblclick', () => startRename(chip, name, v));
+    chip.append(name,
+      btn('◀', '左へ', () => moveVar(i, -1)),
+      btn('▶', '右へ', () => moveVar(i, 1)),
+      btn('✕', 'この変数の列を削除', () => removeVar(v.id)));
+    box.appendChild(chip);
+  });
+}
+
+function startRename(chip, nameEl, v) {
+  const inp = document.createElement('input'); inp.type = 'text'; inp.value = v.name;
+  chip.replaceChild(inp, nameEl); inp.focus(); inp.select();
+  let done = false;
+  const commit = () => {
+    if (done) return; done = true;
+    const nv = inp.value.trim();
+    if (nv && nv !== v.name && !cur().vars.some(x => x.name === nv)) { pushUndo(); v.name = nv; }
+    renderVars(); renderTable(); scheduleSave();
+  };
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    else if (e.key === 'Escape') { done = true; renderVars(); }
+  });
+  inp.addEventListener('blur', commit);
+}
+
+function renderTable() {
+  const d = cur(); const t = $('#trace');
+  const lines = codeLinesArr();
+  const cols = [
+    { key: 'line', label: '行', cls: 'c-line' },
+    ...d.vars.map(v => ({ key: v.id, label: v.name, cls: 'c-var' })),
+    { key: 'out', label: '出力', cls: 'c-out' },
+    { key: 'note', label: '備考', cls: 'c-note' },
+  ];
+  let html = '<thead><tr><th class="c-num">#</th>' +
+    cols.map(c => `<th class="${c.cls}">${esc(c.label)}</th>`).join('') +
+    '<th class="c-ops">操作</th></tr></thead><tbody>';
+  d.rows.forEach((row, r) => {
+    html += `<tr data-r="${r}"><td class="c-num">${r + 1}</td>`;
+    cols.forEach(c => {
+      const val = getVal(row, c.key);
+      let title = '';
+      if (c.key === 'line') { const ln = parseInt(val, 10); if (ln >= 1 && ln <= lines.length) title = lines[ln - 1].trim(); }
+      html += `<td class="${c.cls}"><input type="text" data-r="${r}" data-c="${esc(c.key)}" value="${esc(val)}" title="${esc(title)}" spellcheck="false" autocomplete="off"></td>`;
+    });
+    html += `<td class="c-ops">` +
+      `<button type="button" tabindex="-1" data-op="ins" data-r="${r}" title="この下に行を挿入">＋</button>` +
+      `<button type="button" tabindex="-1" data-op="up" data-r="${r}" title="上へ移動">↑</button>` +
+      `<button type="button" tabindex="-1" data-op="down" data-r="${r}" title="下へ移動">↓</button>` +
+      `<button type="button" tabindex="-1" data-op="del" data-r="${r}" title="この行を削除" class="danger">✕</button>` +
+      `</td></tr>`;
+  });
+  html += '</tbody>';
+  t.innerHTML = html;
+  $('#emptyRows').hidden = d.rows.length > 0;
+  refreshAllHighlights();
+  updateActiveRow();
+}
+
+function refreshAllHighlights() { cur().rows.forEach((_, r) => refreshRowHighlights(r)); }
+function refreshRowHighlights(r) {
+  const d = cur(); if (r < 0 || r >= d.rows.length) return;
+  const row = d.rows[r], prev = d.rows[r - 1];
+  const tr = $(`#trace tbody tr[data-r="${r}"]`); if (!tr) return;
+  const on = $('#hilite').checked;
+  $$('input', tr).forEach(inp => {
+    const c = inp.dataset.c; let changed = false;
+    if (c === 'out') changed = row.out.trim() !== '';
+    else if (c !== 'line' && c !== 'note') {
+      const v = (row.vals[c] ?? '').trim();
+      changed = v !== '' && (!prev || v !== (prev.vals[c] ?? '').trim());
+    }
+    inp.parentElement.classList.toggle('changed', on && changed);
+  });
+}
+
+function updateActiveRow() {
+  const d = cur();
+  if (activeRow >= d.rows.length) activeRow = d.rows.length - 1;
+  $$('#trace tbody tr').forEach(tr => tr.classList.toggle('active', +tr.dataset.r === activeRow));
+  updateActiveLine();
+}
+function updateActiveLine() {
+  const d = cur(); const row = d.rows[activeRow];
+  const ln = row ? parseInt(row.line, 10) : NaN;
+  let activeLi = null;
+  $$('#codeLines li').forEach(li => {
+    const hit = +li.dataset.line === ln;
+    li.classList.toggle('active', hit);
+    if (hit) activeLi = li;
+  });
+  if (activeLi && typeof activeLi.scrollIntoView === 'function') activeLi.scrollIntoView({ block: 'nearest' });
+  const ac = $('#activeCode');
+  const lines = codeLinesArr();
+  if (row && ln >= 1 && ln <= lines.length && d.code.trim() !== '') {
+    ac.innerHTML = `<b>行 ${ln}</b>  ${esc(lines[ln - 1].trim())}`;
+  } else if (row && row.line.trim() !== '') {
+    ac.innerHTML = `<b>行 ${esc(row.line)}</b>  <span class="muted">（該当するコード行がありません）</span>`;
+  } else {
+    ac.textContent = '';
+  }
+}
+
+function focusCell(r, c) {
+  const inp = $(`#trace input[data-r="${r}"][data-c="${CSS.escape(c)}"]`);
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+/* ---------- 行の操作 ---------- */
+// after: 挿入位置の基準となる行 index（null なら選択中の行、行がなければ末尾）
+// focusCol: 'firstVar' | 列キー | null（'line'）
+function addRow(opts = {}, after = null, focusCol = null) {
+  const d = cur(); pushUndo();
+  let idx = after;
+  if (idx == null) idx = (activeRow >= 0 && activeRow < d.rows.length) ? activeRow : d.rows.length - 1;
+  const insertAt = idx + 1;
+  const prev = d.rows[idx] || null;
+  const row = { line: opts.line || '', vals: {}, out: '', note: '' };
+  if (prev && $('#copyPrev').checked) for (const v of d.vars) row.vals[v.id] = prev.vals[v.id] ?? '';
+  d.rows.splice(insertAt, 0, row);
+  activeRow = insertAt;
+  renderTable();
+  let col = 'line';
+  if (focusCol === 'firstVar') col = d.vars[0] ? d.vars[0].id : 'line';
+  else if (focusCol) col = focusCol;
+  focusCell(insertAt, col);
+  scheduleSave();
+}
+function deleteRow(r) {
+  const d = cur(); if (r < 0 || r >= d.rows.length) return;
+  pushUndo(); d.rows.splice(r, 1);
+  activeRow = Math.min(r, d.rows.length - 1);
+  renderTable();
+  if (activeRow >= 0) focusCell(activeRow, 'line');
+  scheduleSave();
+}
+function moveRow(r, dir, col) {
+  const d = cur(); const t = r + dir;
+  if (r < 0 || r >= d.rows.length || t < 0 || t >= d.rows.length) return;
+  pushUndo();
+  [d.rows[r], d.rows[t]] = [d.rows[t], d.rows[r]];
+  activeRow = t; renderTable(); focusCell(t, col || 'line'); scheduleSave();
+}
+function clearRows() {
+  const d = cur(); if (!d.rows.length) return;
+  pushUndo(); d.rows = []; activeRow = -1; renderTable(); scheduleSave();
+  toast('表をクリアしました（「元に戻す」で復元できます）');
+}
+
+/* ---------- 変数（列）の操作 ---------- */
+function addVars(text) {
+  const d = cur();
+  const names = text.split(/[,，、\s]+/).map(s => s.trim()).filter(Boolean);
+  const added = [];
+  for (const n of names) if (!d.vars.some(v => v.name === n)) added.push(n);
+  if (!added.length) return 0;
+  pushUndo();
+  for (const n of added) d.vars.push({ id: uid(), name: n });
+  renderVars(); renderTable(); scheduleSave();
+  return added.length;
+}
+function removeVar(id) {
+  const d = cur(); pushUndo();
+  d.vars = d.vars.filter(v => v.id !== id);
+  d.rows.forEach(r => { delete r.vals[id]; });
+  renderVars(); renderTable(); scheduleSave();
+}
+function moveVar(i, dir) {
+  const d = cur(); const t = i + dir;
+  if (t < 0 || t >= d.vars.length) return;
+  pushUndo();
+  [d.vars[i], d.vars[t]] = [d.vars[t], d.vars[i]];
+  renderVars(); renderTable(); scheduleSave();
+}
+
+/* ---------- 変数名の自動抽出 ---------- */
+const EXCLUDE = new Set(['args', 'main', 'String', 'int', 'long', 'short', 'byte', 'double', 'float', 'boolean', 'char', 'var',
+  'new', 'return', 'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'break', 'continue', 'class', 'public', 'private',
+  'static', 'void', 'null', 'true', 'false', 'this', 'length', 'System', 'out', 'println', 'print', 'printf',
+  '整数型', '実数型', '文字列型', '文字型', '論理型', '大域', 'in', 'is', 'not', 'and', 'or', 'def', 'print', 'range', 'len']);
+function stripStrings(s) {
+  return s.replace(/"(?:\\.|[^"\\])*"/g, '""').replace(/'(?:\\.|[^'\\])*'/g, "''").replace(/[“”]([^“”]*)[“”]/g, '""');
+}
+function stripNested(s) {
+  let prev;
+  do { prev = s; s = s.replace(/\([^()]*\)/g, '()').replace(/\{[^{}]*\}/g, '{}').replace(/\[[^\[\]]*\]/g, '[]'); } while (s !== prev);
+  return s;
+}
+function extractVarNames(code) {
+  const names = [];
+  const add = n => { n = (n || '').trim(); if (n && !EXCLUDE.has(n) && !names.includes(n)) names.push(n); };
+  const src = stripStrings(code);
+  let m;
+  // 1) 型付き宣言（Java / C 系）
+  const typeRe = /\b(?:int|long|short|byte|double|float|boolean|char|String|var)\b(?:\s*\[\s*\])*\s+([A-Za-z_$][\w$]*)/g;
+  while ((m = typeRe.exec(src))) {
+    add(m[1]);
+    const rest = src.slice(m.index + m[0].length).split(/[;\n]/)[0];
+    const parts = stripNested(rest).split(',');
+    for (let i = 1; i < parts.length; i++) {
+      const mm = parts[i].match(/^\s*([A-Za-z_$][\w$]*)\s*(?:=|\[|$)/);
+      if (mm) add(mm[1]);
+    }
+  }
+  // 2) IPA 擬似言語（「整数型: i, j」「整数型の配列: data」など。○付きの関数名は除外）
+  const pseudoRe = /(^|[^○])(?:整数型|実数型|文字列型|文字型|論理型)(?:の配列)*\s*[:：]\s*([^\n]*)/g;
+  while ((m = pseudoRe.exec(src))) {
+    const parts = stripNested(m[2]).split(/[,，]/);
+    for (const p0 of parts) {
+      const p = p0.split(/[:：]/).pop();
+      const mm = p.match(/^\s*([\p{L}_][\p{L}\p{N}_]*)/u);
+      if (mm) add(mm[1]);
+    }
+  }
+  // 3) 汎用（Python など。1・2 で何も見つからないときだけ）
+  if (!names.length) {
+    const genRe = /^\s*([A-Za-z_]\w*)\s*(?:[+\-*\/%]|\*\*|\/\/)?=(?!=)/gm;
+    while ((m = genRe.exec(src))) add(m[1]);
+    const forRe = /\bfor\s+([A-Za-z_]\w*)\s+in\b/g;
+    while ((m = forRe.exec(src))) add(m[1]);
+  }
+  return names;
+}
+function extractVars() {
+  const d = cur();
+  if (!d.code.trim()) { toast('先にコードを貼り付けてください'); return; }
+  const names = extractVarNames(d.code);
+  if (!names.length) { toast('宣言文が見つかりませんでした。右の欄から手動で追加してください'); return; }
+  const n = addVars(names.join(','));
+  toast(n ? `${n} 個の変数を列に追加しました（不要な列は ✕ で削除）` : '新しい変数はありませんでした');
+}
+
+/* ---------- 書き出し / 読み込み ---------- */
+function tableData() {
+  const d = cur();
+  const header = ['#', '行', ...d.vars.map(v => v.name), '出力', '備考'];
+  const rows = d.rows.map((r, i) => [String(i + 1), r.line, ...d.vars.map(v => r.vals[v.id] ?? ''), r.out, r.note]);
+  return { header, rows };
+}
+function buildMarkdown() {
+  const d = cur(); const { header, rows } = tableData();
+  const e = s => String(s).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+  let out = '';
+  if (d.title) out += '## ' + d.title + '\n\n';
+  if (d.code.trim()) out += '```\n' + d.code + '\n```\n\n';
+  out += '| ' + header.map(e).join(' | ') + ' |\n|' + header.map(() => ' --- ').join('|') + '|\n';
+  rows.forEach(r => { out += '| ' + r.map(e).join(' | ') + ' |\n'; });
+  return out;
+}
+function buildTSV() {
+  const { header, rows } = tableData();
+  const e = s => String(s).replace(/[\t\r\n]/g, ' ');
+  return [header, ...rows].map(r => r.map(e).join('\t')).join('\n');
+}
+function buildCSV() {
+  const { header, rows } = tableData();
+  const e = s => '"' + String(s).replace(/"/g, '""') + '"';
+  return [header, ...rows].map(r => r.map(e).join(',')).join('\r\n');
+}
+function buildJSON() {
+  const d = cur();
+  return JSON.stringify({
+    format: 'trace-table/v1',
+    title: d.title, code: d.code,
+    vars: d.vars.map(v => v.name),
+    rows: d.rows.map(r => ({
+      line: r.line,
+      values: Object.fromEntries(d.vars.map(v => [v.name, r.vals[v.id] ?? ''])),
+      out: r.out, note: r.note,
+    })),
+  }, null, 2);
+}
+function currentFormat() { return ($('input[name="fmt"]:checked') || {}).value || 'md'; }
+function refreshExportText() {
+  const f = currentFormat();
+  $('#exportText').value = f === 'md' ? buildMarkdown() : f === 'tsv' ? buildTSV() : f === 'csv' ? buildCSV() : buildJSON();
+}
+function safeName() { return (cur().title || 'trace').replace(/[\\/:*?"<>|]/g, '_').trim() || 'trace'; }
+function downloadText(name, text, mime) {
+  try {
+    const blob = new Blob([text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    toast(name + ' を保存しました（保存されない環境では「コピー」を使ってください）');
+  } catch (e) {
+    toast('この環境ではファイル保存ができません。「コピー」を使ってください');
+  }
+}
+async function copyText(text, ta) {
+  try { await navigator.clipboard.writeText(text); toast('コピーしました'); return; } catch (e) { /* fallback */ }
+  try { ta.focus(); ta.select(); document.execCommand('copy'); toast('コピーしました'); }
+  catch (e) { toast('コピーできませんでした。テキストを選択して Ctrl+C してください'); }
+}
+function importJSON(text) {
+  let obj;
+  try { obj = JSON.parse(text); } catch (e) { toast('JSON として読み込めませんでした'); return false; }
+  if (!obj || !Array.isArray(obj.rows) || !Array.isArray(obj.vars)) { toast('形式が違います。このアプリの「JSON」で書き出したファイルを指定してください'); return false; }
+  const d = newDoc(String(obj.title ?? ''), String(obj.code ?? ''));
+  d.vars = obj.vars.map(n => ({ id: uid(), name: String(n) }));
+  const byName = Object.fromEntries(d.vars.map(v => [v.name, v.id]));
+  d.rows = obj.rows.map(r => {
+    const row = { line: String(r.line ?? ''), vals: {}, out: String(r.out ?? ''), note: String(r.note ?? '') };
+    for (const [n, v] of Object.entries(r.values || {})) if (byName[n] != null) row.vals[byName[n]] = String(v ?? '');
+    return row;
+  });
+  state.docs.push(d); switchDoc(d.id); save();
+  toast('読み込みました');
+  return true;
+}
+
+/* ---------- 文書の切り替え ---------- */
+function switchDoc(id) {
+  state.currentId = id; undoStack = []; $('#undo').disabled = true; activeRow = -1;
+  renderAll();
+  const ta = $('#codeInput');
+  ta.hidden = cur().code.trim() !== '';
+  $('#toggleCodeEdit').textContent = ta.hidden ? 'コードを編集' : '編集欄を閉じる';
+}
+
+/* ---------- 補助 ---------- */
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+// 2 回クリックで確定する削除ボタン（confirm() が使えない環境でも動く）
+function armConfirm(button, key, label, action) {
+  if (confirmTimers[key]) {
+    clearTimeout(confirmTimers[key]); delete confirmTimers[key];
+    button.textContent = label; action(); return;
+  }
+  const orig = button.textContent;
+  button.textContent = 'もう一度押すと' + label;
+  confirmTimers[key] = setTimeout(() => { delete confirmTimers[key]; button.textContent = orig; }, 3000);
+}
+function applyTheme(t) {
+  if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+  try { if (t) localStorage.setItem(THEME_KEY, t); else localStorage.removeItem(THEME_KEY); } catch (e) { /* ignore */ }
+}
+
+/* ---------- イベント ---------- */
+function bind() {
+  $('#title').addEventListener('input', e => {
+    cur().title = e.target.value;
+    const o = $(`#docSelect option[value="${state.currentId}"]`); if (o) o.textContent = cur().title || '（無題）';
+    scheduleSave();
+  });
+  $('#title').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
+  $('#docSelect').addEventListener('change', e => { save(); switchDoc(e.target.value); });
+  $('#newDoc').addEventListener('click', () => {
+    save(); const d = newDoc(); state.docs.push(d); switchDoc(d.id); save(); $('#title').focus();
+  });
+  $('#dupDoc').addEventListener('click', () => {
+    save(); const src = cur(); const d = JSON.parse(JSON.stringify(src));
+    d.id = uid(); d.title = (src.title || '無題') + ' のコピー'; d.updated = Date.now();
+    state.docs.push(d); switchDoc(d.id); save(); toast('複製しました');
+  });
+  $('#delDoc').addEventListener('click', e => armConfirm(e.currentTarget, 'delDoc', '削除', () => {
+    const id = state.currentId;
+    state.docs = state.docs.filter(d => d.id !== id);
+    if (!state.docs.length) state.docs.push(newDoc());
+    switchDoc(state.docs[0].id); save(); toast('削除しました');
+  }));
+
+  // コード
+  const ta = $('#codeInput');
+  ta.addEventListener('input', () => { cur().code = ta.value; renderCode(); scheduleSave(); });
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const s = ta.selectionStart, en = ta.selectionEnd;
+      ta.value = ta.value.slice(0, s) + '    ' + ta.value.slice(en);
+      ta.selectionStart = ta.selectionEnd = s + 4;
+      ta.dispatchEvent(new Event('input'));
+    }
+  });
+  $('#toggleCodeEdit').addEventListener('click', e => {
+    ta.hidden = !ta.hidden;
+    e.currentTarget.textContent = ta.hidden ? 'コードを編集' : '編集欄を閉じる';
+    if (!ta.hidden) ta.focus();
+  });
+  $('#extractVars').addEventListener('click', extractVars);
+
+  // 変数
+  const nv = $('#newVar');
+  nv.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const n = addVars(nv.value);
+      if (n) nv.value = ''; else if (nv.value.trim()) toast('同じ名前の変数がすでにあります');
+    }
+  });
+  $('#copyPrev').addEventListener('change', () => {});
+  $('#hilite').addEventListener('change', refreshAllHighlights);
+
+  // 表
+  $('#addRow').addEventListener('click', () => addRow({}, cur().rows.length - 1, 'line'));
+  $('#undo').addEventListener('click', undo);
+  $('#clearRows').addEventListener('click', e => armConfirm(e.currentTarget, 'clearRows', 'クリア', clearRows));
+
+  const t = $('#trace');
+  t.addEventListener('input', e => {
+    const inp = e.target; if (inp.tagName !== 'INPUT') return;
+    const r = +inp.dataset.r, c = inp.dataset.c;
+    setVal(cur().rows[r], c, inp.value);
+    refreshRowHighlights(r); refreshRowHighlights(r + 1);
+    if (c === 'line') updateActiveLine();
+    scheduleSave();
+  });
+  t.addEventListener('focusin', e => {
+    if (e.target.tagName === 'INPUT') { activeRow = +e.target.dataset.r; updateActiveRow(); }
+  });
+  t.addEventListener('keydown', e => {
+    const inp = e.target; if (inp.tagName !== 'INPUT') return;
+    const r = +inp.dataset.r, c = inp.dataset.c; const last = cur().rows.length - 1;
+    const ctrl = e.ctrlKey || e.metaKey;
+    if (e.key === 'Enter' && ctrl) { e.preventDefault(); addRow({}, r, 'line'); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (e.shiftKey) { if (r > 0) focusCell(r - 1, c); }
+      else if (r === last) addRow({}, r, 'line');
+      else focusCell(r + 1, c);
+    }
+    else if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); moveRow(r, -1, c); }
+    else if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); moveRow(r, 1, c); }
+    else if (e.key === 'ArrowDown') { if (r < last) { e.preventDefault(); focusCell(r + 1, c); } }
+    else if (e.key === 'ArrowUp') { if (r > 0) { e.preventDefault(); focusCell(r - 1, c); } }
+    else if (ctrl && e.key.toLowerCase() === 'd') {
+      e.preventDefault();
+      if (r > 0) {
+        const v = getVal(cur().rows[r - 1], c);
+        inp.value = v; setVal(cur().rows[r], c, v);
+        refreshRowHighlights(r); refreshRowHighlights(r + 1);
+        if (c === 'line') updateActiveLine();
+        scheduleSave();
+      }
+    }
+  });
+  t.addEventListener('click', e => {
+    const b = e.target.closest('button[data-op]'); if (!b) return;
+    const r = +b.dataset.r;
+    if (b.dataset.op === 'ins') addRow({}, r, 'line');
+    else if (b.dataset.op === 'del') deleteRow(r);
+    else if (b.dataset.op === 'up') moveRow(r, -1);
+    else if (b.dataset.op === 'down') moveRow(r, 1);
+  });
+
+  // 書き出し
+  const dlgE = $('#dlgExport');
+  $('#btnExport').addEventListener('click', () => { refreshExportText(); dlgE.showModal(); });
+  $('#exportFormats').addEventListener('change', refreshExportText);
+  $('#exportCopy').addEventListener('click', () => copyText($('#exportText').value, $('#exportText')));
+  $('#exportSave').addEventListener('click', () => {
+    const f = currentFormat(); const text = $('#exportText').value; const base = safeName();
+    if (f === 'md') downloadText(base + '.md', text, 'text/markdown;charset=utf-8');
+    else if (f === 'tsv') downloadText(base + '.tsv', text, 'text/tab-separated-values;charset=utf-8');
+    else if (f === 'csv') downloadText(base + '.csv', '\uFEFF' + text, 'text/csv;charset=utf-8');
+    else downloadText(base + '.json', text, 'application/json;charset=utf-8');
+  });
+  $('#exportClose').addEventListener('click', () => dlgE.close());
+
+  // 読み込み
+  const dlgI = $('#dlgImport');
+  $('#btnImport').addEventListener('click', () => { $('#importText').value = ''; $('#importFile').value = ''; dlgI.showModal(); });
+  $('#importFile').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const fr = new FileReader();
+    fr.onload = () => { $('#importText').value = String(fr.result); };
+    fr.readAsText(f, 'utf-8');
+  });
+  $('#importRun').addEventListener('click', () => { if (importJSON($('#importText').value)) dlgI.close(); });
+  $('#importClose').addEventListener('click', () => dlgI.close());
+
+  $('#btnPrint').addEventListener('click', () => { save(); window.print(); });
+  $('#btnTheme').addEventListener('click', () => {
+    const explicit = document.documentElement.dataset.theme;
+    const dark = explicit ? explicit === 'dark' : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    applyTheme(dark ? 'light' : 'dark');
+  });
+
+  // 全体ショートカット
+  document.addEventListener('keydown', e => {
+    const ctrl = e.ctrlKey || e.metaKey;
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (ctrl && e.key.toLowerCase() === 's') { e.preventDefault(); save(); toast('保存しました（ブラウザ内に自動保存されます）'); }
+    else if (ctrl && e.key.toLowerCase() === 'z' && tag !== 'input' && tag !== 'textarea') { e.preventDefault(); undo(); }
+  });
+  window.addEventListener('beforeunload', save);
+}
+
+/* ---------- 起動 ---------- */
+try { const t = localStorage.getItem(THEME_KEY); if (t) applyTheme(t); } catch (e) { /* ignore */ }
+load();
+bind();
+switchDoc(state.currentId);
+})();
+</script>
+</body>
+</html>
