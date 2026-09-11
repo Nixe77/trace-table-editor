@@ -312,6 +312,15 @@ jOk('文字列の .length() と .equals()', `String s = "abc";
 System.out.println(s.length());
 if (s.equals("abc")) { System.out.println("same"); }`, ['3', 'same']);
 jErr('対応外の文字列メソッド', `String s = "ab"; System.out.println(s.charAt(0));`, /charAt/);
+
+// セミコロン抜けは、次の行ではなく「足りない行」を指して知らせること
+r = (() => { try { JavaToPseudo.convert('int sum = 0\nfor (int i = 1; i <= 3; i++) {\n}'); return {}; }
+  catch (e) { return { msg: JavaToPseudo.errorMessage(e), line: e.line }; } })();
+ok('J2P セミコロン抜けは足りない行を指す', r.line === 1 && /行 1:/.test(r.msg) && /;/.test(r.msg), J(r));
+
+r = (() => { try { JavaToPseudo.convert('int a = (1 + 2\nint b = 3;'); return {}; }
+  catch (e) { return { msg: JavaToPseudo.errorMessage(e), line: e.line }; } })();
+ok('J2P 閉じ括弧抜けも足りない行を指す', r.line === 1, J(r));
 jErr('printf', `System.out.printf("%d", 1);`, /printf/);
 jErr('式の中の ++', `int[] a = {1, 2}; int i = 0; int x = a[i++];`, /\+\+/);
 jErr('オブジェクト生成', `Scanner sc = new Scanner(System.in);`, /new/);

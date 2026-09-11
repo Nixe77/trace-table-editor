@@ -111,13 +111,27 @@ input[type=text]:focus,textarea:focus,select:focus,button:focus-visible{outline:
 #emptyRows{padding:22px 12px;text-align:center;color:var(--muted)}
 
 /* 自動トレース */
-.autobar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0 0 6px}
-#entryCall{flex:1 1 150px;min-width:130px;font-family:var(--mono)}
+.autobar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0 0 8px}
+#entryCall{flex:1 1 140px;min-width:120px;font-family:var(--mono);font-size:12px;padding:3px 6px}
 #lang{max-width:180px}
-.autoopts{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px;margin-bottom:8px}
+.bar-sep{width:1px;align-self:stretch;min-height:22px;background:var(--line);margin:0 3px}
+.field{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)}
+.field>span{white-space:nowrap}
+.field select{padding:3px 6px;font-size:13px}
+.autoopts{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:8px;padding:6px 8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--code-bg)}
 .autoopts label{display:inline-flex;align-items:center;gap:4px}
-.automsg{border:1px solid var(--line);border-radius:var(--radius);padding:6px 10px;font-size:13px;margin:8px 0 0;white-space:pre-wrap;background:var(--code-bg)}
-.automsg.error{border-color:var(--danger);color:var(--danger)}
+.autoopts label:has(#condRows){color:var(--ink)}
+.linklike{border:0;background:transparent;color:var(--accent);padding:0 2px;font-size:12px;text-decoration:underline}
+.keyhelp{border:1px solid var(--line);border-radius:var(--radius);padding:6px 10px;background:var(--code-bg);line-height:1.9}
+.automsg{border:1px solid var(--line);border-left-width:4px;border-radius:var(--radius);padding:8px 10px;font-size:13px;margin:8px 0 0;white-space:pre-wrap;background:var(--code-bg)}
+.automsg.ok{border-left-color:var(--accent)}
+.automsg.error{border-color:var(--danger);border-left-color:var(--danger);color:var(--danger);background:var(--wrong)}
+.automsg .amsg-head{display:flex;gap:6px;align-items:baseline;font-weight:600}
+.automsg .amsg-body{white-space:pre-wrap;font-weight:400}
+.automsg .amsg-line{display:block;margin-top:6px;font-family:var(--mono);font-size:12px;white-space:pre;overflow-x:auto;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:3px 8px}
+.automsg .amsg-line b{color:var(--danger)}
+#codeLines li.errline{background:var(--wrong);border-left-color:var(--danger)}
+#codeLines li.errline .ln{color:var(--wrong-ink);font-weight:700}
 .steppanel{border:1px solid var(--accent);border-radius:var(--radius);padding:8px 10px;margin:8px 0 0;background:var(--accent-soft)}
 .steprow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:3px 0}
 .steprow code{font-family:var(--mono);white-space:pre;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -149,7 +163,8 @@ dialog textarea{width:100%;min-height:260px;font-family:var(--mono);font-size:12
 @media print{
   body{background:#fff;color:#000;font-size:11pt}
   .topbar{border:0;padding:0 0 8px}
-  .brand,.docs,.actions,#codeInput,#toggleCodeEdit,#extractVars,.varbar,.controls,.hint,.c-ops,#emptyRows,#toast,.pane-head button,.autobar,.autoopts,.steppanel,.automsg,details.help{display:none!important}
+  .brand,.docs,.actions,#codeInput,#toggleCodeEdit,#extractVars,.varbar,.controls,.hint,.keyhelp,.c-ops,#emptyRows,#toast,.pane-head button,.autobar,.autoopts,.steppanel,.automsg,details.help{display:none!important}
+  #codeLines li.errline{background:transparent!important}
   #title{border:0;padding:0;font-size:15pt;font-weight:700;background:transparent;color:#000;width:100%}
   .layout{display:block;padding:0}
   .pane{border:0;padding:0;margin-bottom:12px;background:transparent}
@@ -195,18 +210,23 @@ dialog textarea{width:100%;min-height:260px;font-family:var(--mono);font-size:12
       <button id="extractVars" class="small" title="宣言文から変数名を取り出して列に追加">変数を抽出</button>
     </div>
     <div class="autobar">
-      <select id="lang" aria-label="言語">
-        <option value="pseudo">擬似言語（IPA 科目B）</option>
-        <option value="java">Java</option>
-      </select>
-      <input type="text" id="entryCall" placeholder="呼び出し式（例: fact(3)）※関数だけのとき" spellcheck="false" aria-label="呼び出し式">
+      <label class="field"><span>言語</span>
+        <select id="lang" aria-label="言語">
+          <option value="pseudo">擬似言語（IPA 科目B）</option>
+          <option value="java">Java</option>
+        </select>
+      </label>
+      <button id="btnAuto" class="primary" title="コードを実行してトレース表を自動生成">▶ 自動トレース</button>
+      <button id="btnStep" title="1 行ずつ実行して値の変化を見る">1ステップ実行</button>
+      <button id="btnCheck" title="自分で書いた表と自動トレースを照合">答え合わせ</button>
+      <span class="bar-sep"></span>
       <button id="btnConvert" class="small">Java に変換</button>
-      <button id="btnAuto" class="primary small" title="コードを実行してトレース表を自動生成">自動トレース</button>
-      <button id="btnStep" class="small" title="1 行ずつ実行して値の変化を見る">1ステップ実行</button>
-      <button id="btnCheck" class="small" title="自分で書いた表と自動トレースを照合">答え合わせ</button>
     </div>
     <div class="autoopts">
-      <label>配列の先頭番号
+      <label class="field"><span>呼び出し式</span>
+        <input type="text" id="entryCall" placeholder="例: fact(3)　※主処理が無いとき" spellcheck="false" aria-label="呼び出し式">
+      </label>
+      <label class="field"><span>配列の先頭番号</span>
         <select id="arrayBase"><option value="1">1</option><option value="0">0</option></select>
       </label>
       <label><input type="checkbox" id="condRows" checked> if / while の条件判定も行にする</label>
@@ -214,9 +234,13 @@ dialog textarea{width:100%;min-height:260px;font-family:var(--mono);font-size:12
     <textarea id="codeInput" placeholder="ここに Java や擬似言語のコードを貼り付け（Tab でインデント）" spellcheck="false"></textarea>
     <ol id="codeLines"></ol>
     <p class="hint">
-      行をクリックすると、その場でコードを書き換えられます。<kbd>Enter</kbd> 次の行へ　<kbd>Shift+Enter</kbd> 前の行へ　<kbd>Esc</kbd> 取り消し　<kbd>Ctrl+Enter</kbd> 下に空行を挿入　空行で <kbd>Backspace</kbd> その行を削除<br>
-      行の右端の <b>＋</b> を押すと、選択中の行の下にその行番号のステップが追加されます。まとめて書き換えるときは「コードを編集」。
+      <b>行をクリックするとその場で書き換えられます</b>（<kbd>Enter</kbd> 次の行　<kbd>Esc</kbd> 取り消し）。右端の <b>＋</b> でその行のステップを表に追加。
+      <button id="showKeys" class="linklike" type="button">キー操作をすべて見る</button>
     </p>
+    <div id="keyHelp" class="hint keyhelp" hidden>
+      <kbd>Enter</kbd> 確定して次の行へ　<kbd>Shift+Enter</kbd> 前の行へ　<kbd>Esc</kbd> 取り消し　<kbd>Ctrl+Enter</kbd> 下に空行を挿入　空行で <kbd>Backspace</kbd> その行を削除<br>
+      まとめて書き換えたり貼り直すときは上の「コードを編集」。行の追加・削除は <kbd>Ctrl+Z</kbd> で元に戻せます。
+    </div>
     <div id="stepPanel" class="steppanel" hidden>
       <div class="steprow"><b>行 <span id="stepLine"></span></b> <code id="stepCode"></code></div>
       <div id="stepVars" class="stepvars"></div>
@@ -1129,8 +1153,14 @@ class Parser {
   get line() { return this.peek().line; }
   expect(t, what) {
     if (this.at(t)) return this.next();
-    const tok = this.peek();
-    throw new JCError(`${what || '「' + t + '」'} が必要です（${tok.t === 'EOF' ? 'コードの終わり' : '「' + tok.v + '」'} があります）`, tok.line);
+    const tok = this.peek(), prev = this.toks[this.i - 1];
+    const found = tok.t === 'EOF' ? 'コードの終わり' : '「' + tok.v + '」';
+    // 次の字句が別の行にあるなら、足りないのは直前の行の終わり。その行を指して伝える
+    if (prev && (tok.t === 'EOF' || tok.line > prev.line)) {
+      if (t === ';') throw new JCError('行の終わりに「;」がありません（この行の最後に ; を付けてください）', prev.line);
+      if (t === ')' || t === ']' || t === '}') throw new JCError(`「${t}」が閉じていません（${found} まで探しましたが見つかりません）`, prev.line);
+    }
+    throw new JCError(`${what || '「' + t + '」'} が必要です（${found} があります）`, tok.line);
   }
   save() { return this.i; }
   restore(p) { this.i = p; }
@@ -2752,7 +2782,7 @@ function setVal(row, key, val) {
 /* ---------- 元に戻す ---------- */
 function pushUndo() {
   const d = cur();
-  undoStack.push(JSON.stringify({ vars: d.vars, rows: d.rows }));
+  undoStack.push(JSON.stringify({ vars: d.vars, rows: d.rows, code: d.code }));
   if (undoStack.length > 60) undoStack.shift();
   $('#undo').disabled = false;
 }
@@ -2760,6 +2790,9 @@ function undo() {
   if (!undoStack.length) return;
   const snap = JSON.parse(undoStack.pop());
   const d = cur(); d.vars = snap.vars; d.rows = snap.rows;
+  // コードの書き換え（行の編集・挿入・削除・変換の置き換え）も戻す
+  const codeChanged = typeof snap.code === 'string' && snap.code !== d.code;
+  if (codeChanged) { d.code = snap.code; renderCode(); }
   if (activeRow >= d.rows.length) activeRow = d.rows.length - 1;
   renderVars(); renderTable(); scheduleSave();
   $('#undo').disabled = !undoStack.length;
@@ -2804,6 +2837,7 @@ function renderCode() {
     li.title = 'クリックするとこの行を書き換えられます';
     ol.appendChild(li);
   });
+  if (errorLine) setErrorLine(errorLine);   // 再描画でもエラー行の印を保つ
   updateActiveLine();
 }
 
@@ -2812,18 +2846,20 @@ let lineEditor = null;
 
 function closeLineEdit(commit) {
   if (!lineEditor) return;
-  const { ln, input } = lineEditor;
+  const { ln, input, docId } = lineEditor;
   lineEditor = null;   // 先に外す（replaceWith で起きる blur の再入を防ぐ）
-  const d = cur();
-  const lines = d.code.split('\n');
+  // 編集を始めた文書に書き戻す（編集中に文書を切り替えても、切替先を書き換えないため）
+  const d = state.docs.find(x => x.id === docId);
+  const isCurrent = !!d && d.id === state.currentId;
+  const lines = d ? d.code.split('\n') : [];
   let text = lines[ln - 1] ?? '';
-  if (commit && ln >= 1 && ln <= lines.length && lines[ln - 1] !== input.value) {
+  if (d && commit && ln >= 1 && ln <= lines.length && lines[ln - 1] !== input.value) {
+    if (isCurrent) pushUndo();
     lines[ln - 1] = input.value;
     d.code = lines.join('\n');
-    $('#codeInput').value = d.code;
     text = input.value;
     scheduleSave();
-    updateActiveLine();
+    if (isCurrent) { $('#codeInput').value = d.code; setErrorLine(0); updateActiveLine(); }
   }
   const c = document.createElement('code');
   c.textContent = text || ' ';
@@ -2854,13 +2890,14 @@ function startLineEdit(ln) {
     }
   });
   code.replaceWith(input);
-  lineEditor = { ln, input };
+  lineEditor = { ln, input, docId: cur().id };
   input.focus();
   input.setSelectionRange(input.value.length, input.value.length);
 }
 
 function insertCodeLine(ln) {
   const d = cur();
+  pushUndo();
   const lines = d.code.split('\n');
   lines.splice(ln, 0, '');
   d.code = lines.join('\n');
@@ -2873,6 +2910,7 @@ function removeEmptyCodeLine(ln) {
   const d = cur();
   const lines = d.code.split('\n');
   if (lines.length <= 1 || ln < 1 || ln > lines.length || lines[ln - 1].trim() !== '') return false;
+  pushUndo();
   lines.splice(ln - 1, 1);
   d.code = lines.join('\n');
   renderCode(); scheduleSave();
@@ -3215,10 +3253,45 @@ function importJSON(text) {
 /* ---------- 自動トレース ---------- */
 let stepper = null;
 
-function showAutoMsg(text, isError) {
-  const el = $('#autoMsg'); el.textContent = text; el.classList.toggle('error', !!isError); el.hidden = !text;
+/* エラーの出た行をコード側でも赤く示す（どこが悪いのかを画面上でつなげる） */
+let errorLine = 0;
+function setErrorLine(ln) {
+  errorLine = ln > 0 ? ln : 0;
+  $$('#codeLines li').forEach(li => li.classList.toggle('errline', errorLine > 0 && +li.dataset.line === errorLine));
+  if (errorLine > 0) {
+    const li = $(`#codeLines li[data-line="${errorLine}"]`);
+    if (li && typeof li.scrollIntoView === 'function') li.scrollIntoView({ block: 'nearest' });
+  }
 }
-function hideAutoMsg() { const el = $('#autoMsg'); el.hidden = true; el.textContent = ''; }
+function errorLineOf(e) { return e && typeof e.line === 'number' && e.line > 0 ? e.line : 0; }
+
+function showAutoMsg(text, isError, line = 0) {
+  const el = $('#autoMsg');
+  el.innerHTML = '';
+  el.classList.toggle('error', !!isError);
+  el.classList.toggle('ok', !isError);
+  if (!text) { el.hidden = true; setErrorLine(0); return; }
+  const parts = String(text).split('\n');
+  const head = document.createElement('div'); head.className = 'amsg-head';
+  const icon = document.createElement('span'); icon.textContent = isError ? '⚠' : '✓';
+  const title = document.createElement('span'); title.textContent = parts[0];
+  head.append(icon, title); el.appendChild(head);
+  if (parts.length > 1) {
+    const body = document.createElement('div'); body.className = 'amsg-body';
+    body.textContent = parts.slice(1).join('\n');
+    el.appendChild(body);
+  }
+  const lines = codeLinesArr();
+  if (line >= 1 && line <= lines.length && cur().code.trim() !== '') {
+    const snip = document.createElement('span'); snip.className = 'amsg-line';
+    const b = document.createElement('b'); b.textContent = `行 ${line}: `;
+    snip.append(b, document.createTextNode(lines[line - 1].trim() || '（空行）'));
+    el.appendChild(snip);
+  }
+  el.hidden = false;
+  setErrorLine(isError ? line : 0);
+}
+function hideAutoMsg() { const el = $('#autoMsg'); el.hidden = true; el.innerHTML = ''; setErrorLine(0); }
 function runOpts() {
   const st = docSettings(cur());
   return { arrayBase: st.arrayBase === 0 ? 0 : 1, condRows: st.condRows !== false, entryCall: st.entryCall || '', maxSteps: 5000 };
@@ -3286,14 +3359,14 @@ function summaryText(res) {
 }
 function doAutoTrace() {
   const d = cur(); const res = runAuto();
-  if (res.error && !res.steps.length) { showAutoMsg(traceErrorMessage(res.error), true); return; }
+  if (res.error && !res.steps.length) { showAutoMsg(traceErrorMessage(res.error), true, errorLineOf(res.error)); return; }
   pushUndo();
   ensureVarColumns(stepsColumnNames(res.steps));
   d.rows = res.steps.map(rowFromStep);
   activeRow = -1; renderVars(); renderTable(); scheduleSave();
   let msg = `${res.steps.length} 行を生成しました`;
   const extra = summaryText(res); if (extra) msg += '\n' + extra;
-  if (res.error) { msg = traceErrorMessage(res.error) + `\n（エラーまでの ${res.steps.length} 行を表にしました）`; showAutoMsg(msg, true); }
+  if (res.error) { msg = traceErrorMessage(res.error) + `\n（エラーまでの ${res.steps.length} 行を表にしました）`; showAutoMsg(msg, true, errorLineOf(res.error)); }
   else showAutoMsg(msg, false);
   toast(res.error ? 'エラーで停止しました' : '自動トレースを表に反映しました');
 }
@@ -3325,7 +3398,7 @@ function doCheck() {
   const d = cur();
   if (!d.rows.length) { showAutoMsg('表に行がありません。先に自分でトレースを記入してください', true); return; }
   const res = runAuto();
-  if (res.error && !res.steps.length) { showAutoMsg(traceErrorMessage(res.error), true); return; }
+  if (res.error && !res.steps.length) { showAutoMsg(traceErrorMessage(res.error), true, errorLineOf(res.error)); return; }
   clearMarks();
   const steps = res.steps;
   const manualLines = d.rows.map(r => normCell(r.line));
@@ -3376,7 +3449,7 @@ function stepStart() {
   if (!d.code.trim()) { showAutoMsg('コードが空です', true); return; }
   let ctx;
   try { ctx = prepareRun(); }
-  catch (e) { showAutoMsg(traceErrorMessage(e), true); return; }
+  catch (e) { showAutoMsg(traceErrorMessage(e), true, errorLineOf(e)); return; }
   stepper = { gen: PseudoLang.run(ctx.program, ctx.opts), mapLine: ctx.mapLine, prev: null, cur: null, done: false, outs: [], result: undefined, error: null };
   hideAutoMsg();
   $('#stepPanel').hidden = false;
@@ -3476,7 +3549,7 @@ function doConvert() {
 function convertJavaToPseudo(d) {
   let r;
   try { r = JavaToPseudo.convert(d.code); }
-  catch (e) { convertResult = null; showAutoMsg(JavaToPseudo.errorMessage(e), true); toast('変換できませんでした'); return; }
+  catch (e) { convertResult = null; showAutoMsg(JavaToPseudo.errorMessage(e), true, errorLineOf(e)); toast('変換できませんでした'); return; }
   convertResult = r; convertMode = 'j2p';
   const notes = [];
   if (r.usesArray) notes.push('配列を使っているので、反映するときに「配列の先頭番号」を 0 にします（Java に合わせるため）');
@@ -3494,7 +3567,7 @@ function convertPseudoToJava(d) {
       entryCall: st.entryCall || '',
       className: 'Main'
     });
-  } catch (e) { convertResult = null; showAutoMsg(PseudoToJava.errorMessage(e), true); toast('変換できませんでした'); return; }
+  } catch (e) { convertResult = null; showAutoMsg(PseudoToJava.errorMessage(e), true, errorLineOf(e)); toast('変換できませんでした'); return; }
   convertResult = r; convertMode = 'p2j';
   const notes = r.warnings.slice();
   notes.push('そのまま Main.java として保存すればコンパイルできます。');
@@ -3520,6 +3593,7 @@ function convertToNewDoc() {
 function convertReplace() {
   if (!convertResult) return;
   const d = cur();
+  pushUndo();
   d.code = convertResult.code;
   applyConvertedSettings(d);
   const st = docSettings(d);
@@ -3534,6 +3608,7 @@ function convertReplace() {
 
 /* ---------- 文書の切り替え ---------- */
 function switchDoc(id) {
+  closeLineEdit(true);   // 書き換え中の行は元の文書へ確定してから切り替える
   state.currentId = id; undoStack = []; $('#undo').disabled = true; activeRow = -1;
   stepStop(); hideAutoMsg();
   const st = docSettings(cur());
@@ -3611,6 +3686,11 @@ function bind() {
     if (!ta.hidden) ta.focus();
   });
   $('#extractVars').addEventListener('click', extractVars);
+  $('#showKeys').addEventListener('click', e => {
+    const box = $('#keyHelp');
+    box.hidden = !box.hidden;
+    e.currentTarget.textContent = box.hidden ? 'キー操作をすべて見る' : 'キー操作を閉じる';
+  });
 
   // コード行: クリックでその場編集、＋ でその行のステップを表に追加
   const ol = $('#codeLines');
