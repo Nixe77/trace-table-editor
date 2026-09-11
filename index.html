@@ -66,7 +66,11 @@ input[type=text]:focus,textarea:focus,select:focus,button:focus-visible{outline:
 #codeLines li.active{background:var(--accent-soft);border-left-color:var(--accent)}
 #codeLines li.empty{cursor:default;white-space:normal;color:var(--muted);padding:10px;font-family:var(--font)}
 #codeLines .ln{min-width:2.6em;text-align:right;color:var(--muted);user-select:none;padding-left:6px}
-#codeLines code{font:inherit}
+#codeLines code{font:inherit;flex:1;min-width:0}
+#codeLines input.line-edit{flex:1;min-width:0;font:inherit;padding:0 2px;border:0;border-radius:2px;background:var(--panel);color:var(--ink);outline:2px solid var(--accent);outline-offset:-1px}
+#codeLines .ln-add{opacity:.3;flex:none;border:0;background:transparent;color:var(--muted);padding:0 4px;font-size:12px;line-height:1.4;border-radius:var(--radius)}
+#codeLines li:hover .ln-add,#codeLines .ln-add:focus-visible{opacity:1}
+#codeLines .ln-add:hover{color:var(--accent)}
 
 .varbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 #varChips{display:flex;gap:6px;flex-wrap:wrap}
@@ -152,6 +156,7 @@ dialog textarea{width:100%;min-height:260px;font-family:var(--mono);font-size:12
   #codeLines{max-height:none;overflow:visible;border:1px solid #000;background:#fff;color:#000}
   #codeLines li{cursor:default;border-left:0;background:transparent!important}
   #codeLines .ln{color:#555}
+  #codeLines .ln-add{display:none}
   #activeCode{display:none}
   .table-wrap{max-height:none;overflow:visible;border:0}
   #trace{min-width:0}
@@ -192,9 +197,10 @@ dialog textarea{width:100%;min-height:260px;font-family:var(--mono);font-size:12
     <div class="autobar">
       <select id="lang" aria-label="言語">
         <option value="pseudo">擬似言語（IPA 科目B）</option>
-        <option value="java" disabled>Java（準備中）</option>
+        <option value="java">Java</option>
       </select>
       <input type="text" id="entryCall" placeholder="呼び出し式（例: fact(3)）※関数だけのとき" spellcheck="false" aria-label="呼び出し式">
+      <button id="btnConvert" class="small">Java に変換</button>
       <button id="btnAuto" class="primary small" title="コードを実行してトレース表を自動生成">自動トレース</button>
       <button id="btnStep" class="small" title="1 行ずつ実行して値の変化を見る">1ステップ実行</button>
       <button id="btnCheck" class="small" title="自分で書いた表と自動トレースを照合">答え合わせ</button>
@@ -207,7 +213,10 @@ dialog textarea{width:100%;min-height:260px;font-family:var(--mono);font-size:12
     </div>
     <textarea id="codeInput" placeholder="ここに Java や擬似言語のコードを貼り付け（Tab でインデント）" spellcheck="false"></textarea>
     <ol id="codeLines"></ol>
-    <p class="hint">行をクリックすると、選択中の行の下にその行番号のステップが追加されます。</p>
+    <p class="hint">
+      行をクリックすると、その場でコードを書き換えられます。<kbd>Enter</kbd> 次の行へ　<kbd>Shift+Enter</kbd> 前の行へ　<kbd>Esc</kbd> 取り消し　<kbd>Ctrl+Enter</kbd> 下に空行を挿入　空行で <kbd>Backspace</kbd> その行を削除<br>
+      行の右端の <b>＋</b> を押すと、選択中の行の下にその行番号のステップが追加されます。まとめて書き換えるときは「コードを編集」。
+    </p>
     <div id="stepPanel" class="steppanel" hidden>
       <div class="steprow"><b>行 <span id="stepLine"></span></b> <code id="stepCode"></code></div>
       <div id="stepVars" class="stepvars"></div>
@@ -235,6 +244,24 @@ dialog textarea{width:100%;min-height:260px;font-family:var(--mono);font-size:12
         <li>行の作り方: 代入・出力・return は 1 行、if / elseif / while の条件判定は 1 行（設定で省略可）、for は繰返しごとに 1 行＋終了判定 1 行、関数の開始行は引数の値を入れた 1 行。宣言だけの行は値が入らないので行になりません</li>
       </ul>
       <button id="loadExample" class="small">擬似言語の例を新しい表として開く</button>
+    </details>
+    <details class="help">
+      <summary>Java ⇔ 擬似言語 の変換</summary>
+      <ul>
+        <li>ボタンは言語の選択で向きが変わります。<code>Java</code> なら「擬似言語に変換」、<code>擬似言語</code> なら「Java に変換」。変換結果は「新しい表として開く」で別の表になるので、元のコードは残ります</li>
+        <li><b>擬似言語 → Java</b>: そのまま <code>Main.java</code> として保存すればコンパイルできる形で出します。配列の先頭番号が 1 のときは Java の 0 始まりに合わせて要素番号を 1 引きます。<code>÷</code> は実数除算なので <code>(double)</code> を、<code>… の商</code> は整数除算をそのまま使います。<code>大域</code> は <code>static</code> フィールド、<code>○</code> の手続・関数は <code>static</code> メソッド、ブロックの中の宣言は Java のスコープに合わせてメソッド先頭にまとめます。<code>末尾に追加する</code> は配列を作り直すヘルパーメソッドを添えます</li>
+        <li><b>Java の自動トレース</b>: 言語を <code>Java</code> にすれば、<b>変換しなくてもそのまま</b>「自動トレース」「1ステップ実行」「答え合わせ」が使えます。表の行番号は貼り付けた Java の行番号のままです（内部で擬似言語に直して実行し、行番号を Java に戻しています）。配列は Java に合わせて 0 始まりで固定になります</li>
+        <li><b>Java → 擬似言語</b>: 擬似言語での書き方を確かめたいときは「擬似言語に変換」を使います</li>
+        <li>型: <code>int long short byte</code>→整数型　<code>double float</code>→実数型　<code>boolean</code>→論理型　<code>char</code>→文字型　<code>String</code>→文字列型　配列 <code>int[] a</code>→整数型の配列</li>
+        <li>文: 宣言・代入・<code>+= -= *= /= %=</code>・<code>++ --</code>（単独の文のみ）・<code>if / else if / else</code>・<code>while</code>・<code>do-while</code>・<code>for</code>・拡張 for（<code>for (int v : a)</code>）・<code>switch</code>（各 case は break か return で終わること）・<code>return</code></li>
+        <li>式: <code>+ - * / % == != &lt; &gt; &lt;= &gt;= &amp;&amp; || !</code>　整数どうしの <code>/</code> は <code>÷ … の商</code> になります（Java の整数除算に合わせるため）　<code>(int)</code> は切り捨て　<code>Math.abs/max/min/pow/sqrt/floor/ceil/round</code>　配列の <code>.length</code></li>
+        <li>メソッド: <code>static</code> メソッドの定義・呼び出し・再帰。<code>main</code> の中身がそのまま主処理になります。<code>static</code> なフィールドは <code>大域:</code> になります</li>
+        <li>出力: <code>System.out.println(x)</code> / <code>print(x)</code> → <code>出力(x)</code>　引数なしの <code>println()</code> → <code>改行を出力する</code></li>
+        <li>三項演算子 <code>c ? a : b</code> は、代入の右辺全体にあるときだけ if / else に展開します。<code>// …</code> と <code>/* … */</code> のコメントは残します</li>
+        <li><b>配列の先頭番号</b>: Java は 0 始まりなので、配列を使うコードを変換すると設定を自動で 0 に切り替えます</li>
+        <li>未対応: <code>break</code> / <code>continue</code>（switch の break を除く）、<code>printf</code>、<code>charAt</code> など <code>.length()</code> <code>.equals()</code> 以外のメソッド、<code>new</code> によるオブジェクト生成、<code>try</code>、ビット演算、式の中の代入・<code>++</code>。対応外は行番号付きでエラーになります</li>
+      </ul>
+      <button id="loadJavaExample" class="small">Java の例を新しい表として開く</button>
     </details>
   </section>
 
@@ -292,6 +319,18 @@ dialog textarea{width:100%;min-height:260px;font-family:var(--mono);font-size:12
   <div class="dlg-actions">
     <button id="importRun" class="primary">読み込む</button>
     <button id="importClose">閉じる</button>
+  </div>
+</dialog>
+
+<dialog id="dlgConvert">
+  <h3 id="convertTitle">Java から擬似言語への変換</h3>
+  <div id="convertMsg" class="automsg" hidden></div>
+  <textarea id="convertText" readonly spellcheck="false"></textarea>
+  <div class="dlg-actions">
+    <button id="convertNew" class="primary">新しい表として開く（元のコードは残る）</button>
+    <button id="convertApply">この表のコードを置き換える</button>
+    <button id="convertCopy">コピー</button>
+    <button id="convertClose">閉じる</button>
   </div>
 </dialog>
 
@@ -977,6 +1016,1621 @@ return { parse, run, normalize, PLError, errorMessage, disp, outDisp };
 })();
 </script>
 <script>
+/* ===== Java → 擬似言語 変換器 ===== */
+const JavaToPseudo = (() => {
+'use strict';
+
+class JCError extends Error { constructor(msg, line) { super(msg); this.name = 'JCError'; this.line = line; } }
+
+/* ---------- 字句解析 ---------- */
+const PUNCT = ['>>>=', '<<=', '>>=', '>>>', '==', '!=', '<=', '>=', '&&', '||', '++', '--',
+  '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=', '<<', '>>',
+  '{', '}', '(', ')', '[', ']', ';', ',', '.', '=', '+', '-', '*', '/', '%', '<', '>', '!', '~', '&', '|', '^', '?', ':'];
+const RESERVED = new Set(['abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char', 'class', 'const',
+  'continue', 'default', 'do', 'double', 'else', 'enum', 'extends', 'final', 'finally', 'float', 'for', 'goto', 'if',
+  'implements', 'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new', 'package', 'private', 'protected',
+  'public', 'return', 'short', 'static', 'strictfp', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws',
+  'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null', 'var', 'record', 'sealed', 'yield']);
+const MODIFIERS = new Set(['public', 'private', 'protected', 'static', 'final', 'abstract', 'synchronized', 'native', 'strictfp', 'transient', 'volatile', 'default']);
+
+function unescapeChar(c, line) {
+  switch (c) {
+    case 'n': return '\n'; case 't': return '\t'; case 'r': return '\r';
+    case 'b': return '\b'; case 'f': return '\f'; case '0': return '\0';
+    case '\\': return '\\'; case '"': return '"'; case "'": return "'";
+    default: throw new JCError(`解釈できないエスケープ \\${c} があります`, line);
+  }
+}
+
+function tokenize(src) {
+  const toks = [], comments = [];
+  let i = 0, line = 1; const n = src.length;
+  while (i < n) {
+    const ch = src[i];
+    if (ch === '\n') { line++; i++; continue; }
+    if (ch === ' ' || ch === '\t' || ch === '\r' || ch === '\f') { i++; continue; }
+    if (ch === '/' && src[i + 1] === '/') {
+      const st = i + 2; while (i < n && src[i] !== '\n') i++;
+      comments.push({ line, text: src.slice(st, i).trim() }); continue;
+    }
+    if (ch === '/' && src[i + 1] === '*') {
+      const startLine = line, j = src.indexOf('*/', i + 2), end = j < 0 ? n : j + 2;
+      const body = src.slice(i + 2, j < 0 ? n : j);
+      for (let k = i; k < end; k++) if (src[k] === '\n') line++;
+      comments.push({ line: startLine, text: body.replace(/\s*[\r\n]+\s*/g, ' ').replace(/^\*+\s*/, '').trim() });
+      i = end; continue;
+    }
+    if (ch === '"') {
+      let j = i + 1, s = '';
+      for (;;) {
+        if (j >= n || src[j] === '\n') throw new JCError('文字列リテラルの閉じ引用符 " がありません', line);
+        if (src[j] === '"') break;
+        if (src[j] === '\\') { s += unescapeChar(src[j + 1], line); j += 2; } else { s += src[j]; j++; }
+      }
+      toks.push({ t: 'STR', v: s, line }); i = j + 1; continue;
+    }
+    if (ch === "'") {
+      let j = i + 1, s = '';
+      for (;;) {
+        if (j >= n || src[j] === '\n') throw new JCError("文字リテラルの閉じ引用符 ' がありません", line);
+        if (src[j] === "'") break;
+        if (src[j] === '\\') { s += unescapeChar(src[j + 1], line); j += 2; } else { s += src[j]; j++; }
+      }
+      toks.push({ t: 'CHAR', v: s, line }); i = j + 1; continue;
+    }
+    const rest = src.slice(i);
+    let m = rest.match(/^0[xX][0-9a-fA-F_]+[lL]?/);
+    if (m) { toks.push({ t: 'NUM', v: parseInt(m[0].replace(/[_lL]/g, ''), 16), isInt: true, line }); i += m[0].length; continue; }
+    m = rest.match(/^0[bB][01_]+[lL]?/);
+    if (m) { toks.push({ t: 'NUM', v: parseInt(m[0].slice(2).replace(/[_lL]/g, ''), 2), isInt: true, line }); i += m[0].length; continue; }
+    m = rest.match(/^(?:\d[\d_]*\.[\d_]*(?:[eE][+-]?\d+)?|\.\d[\d_]*(?:[eE][+-]?\d+)?|\d[\d_]*(?:[eE][+-]?\d+)?)[fFdDlL]?/);
+    if (m) {
+      const raw = m[0], suffix = /[fFdDlL]$/.test(raw) ? raw[raw.length - 1] : '';
+      const body = (suffix ? raw.slice(0, -1) : raw).replace(/_/g, '');
+      const isInt = !/[.eE]/.test(body) && !(suffix && 'fFdD'.includes(suffix));
+      toks.push({ t: 'NUM', v: parseFloat(body), isInt, line }); i += raw.length; continue;
+    }
+    m = rest.match(/^[A-Za-z_$][A-Za-z0-9_$]*/);
+    if (m) { toks.push({ t: RESERVED.has(m[0]) ? m[0] : 'IDENT', v: m[0], line }); i += m[0].length; continue; }
+    const p = PUNCT.find(q => rest.startsWith(q));
+    if (p) { toks.push({ t: p, v: p, line }); i += p.length; continue; }
+    throw new JCError(`解釈できない文字「${ch}」があります`, line);
+  }
+  toks.push({ t: 'EOF', v: '', line });
+  return { toks, comments };
+}
+
+/* ---------- 型 ---------- */
+const NUM_INT = new Set(['int', 'long', 'short', 'byte']);
+const NUM_REAL = new Set(['double', 'float']);
+const UNKNOWN = { b: '?', d: 0 };
+function ty(b, d = 0) { return { b, d }; }
+function isIntType(t) { return !!t && t.d === 0 && NUM_INT.has(t.b); }
+function pseudoTypeName(t, line) {
+  let base;
+  if (NUM_INT.has(t.b)) base = '整数型';
+  else if (NUM_REAL.has(t.b)) base = '実数型';
+  else if (t.b === 'boolean') base = '論理型';
+  else if (t.b === 'char') base = '文字型';
+  else if (t.b === 'String') base = '文字列型';
+  else throw new JCError(`型 ${t.b} は擬似言語に変換できません（int / long / double / float / boolean / char / String と、その配列に対応しています）`, line);
+  if (t.d === 1) return base + 'の配列';
+  if (t.d >= 2) return base + 'の配列の配列';
+  return base;
+}
+
+/* ---------- 構文解析 ---------- */
+class Parser {
+  constructor(toks) { this.toks = toks; this.i = 0; }
+  peek(k = 0) { return this.toks[Math.min(this.i + k, this.toks.length - 1)]; }
+  next() { return this.toks[this.i++]; }
+  at(t) { return this.peek().t === t; }
+  accept(t) { return this.at(t) ? this.next() : null; }
+  get line() { return this.peek().line; }
+  expect(t, what) {
+    if (this.at(t)) return this.next();
+    const tok = this.peek();
+    throw new JCError(`${what || '「' + t + '」'} が必要です（${tok.t === 'EOF' ? 'コードの終わり' : '「' + tok.v + '」'} があります）`, tok.line);
+  }
+  save() { return this.i; }
+  restore(p) { this.i = p; }
+
+  /* 型 */
+  tryType() {
+    const p = this.save(), tok = this.peek();
+    let base = null;
+    if (['int', 'long', 'short', 'byte', 'double', 'float', 'boolean', 'char', 'void'].includes(tok.t)) { base = tok.t; this.next(); }
+    else if (tok.t === 'IDENT' && /^[A-Z]/.test(tok.v)) { base = tok.v; this.next(); }
+    else return null;
+    if (this.at('<')) { this.restore(p); return null; }
+    let d = 0;
+    while (this.at('[') && this.peek(1).t === ']') { this.next(); this.next(); d++; }
+    return ty(base, d);
+  }
+
+  /* プログラム全体 */
+  parseProgram() {
+    const prog = { globals: [], methods: [], main: [], mainLine: 0, hasMain: false };
+    while (!this.at('EOF')) {
+      if (this.at('package') || this.at('import')) { while (!this.at(';') && !this.at('EOF')) this.next(); this.accept(';'); continue; }
+      const mods = this.skipModifiers();
+      if (this.at('class') || this.at('interface') || this.at('enum')) { this.parseTypeDecl(prog); continue; }
+      if (this.at(';')) { this.next(); continue; }
+      if (!this.parseMember(prog, mods, true)) prog.main.push(this.parseStatement());
+    }
+    return prog;
+  }
+  skipModifiers() { const mods = []; while (MODIFIERS.has(this.peek().t)) mods.push(this.next().t); return mods; }
+  parseTypeDecl(prog) {
+    const kw = this.next();
+    if (kw.t !== 'class') throw new JCError(`${kw.v} の宣言は変換できません（class だけに対応しています）`, kw.line);
+    this.expect('IDENT', 'クラス名');
+    while (!this.at('{') && !this.at('EOF')) this.next();
+    this.expect('{', 'クラス本体の「{」');
+    while (!this.at('}') && !this.at('EOF')) {
+      if (this.accept(';')) continue;
+      const mods = this.skipModifiers();
+      if (this.at('class') || this.at('interface') || this.at('enum')) { this.parseTypeDecl(prog); continue; }
+      if (!this.parseMember(prog, mods, false)) {
+        const tok = this.peek();
+        throw new JCError(`クラスの中に変換できない要素があります（「${tok.v}」）。フィールドと static メソッドだけに対応しています`, tok.line);
+      }
+    }
+    this.expect('}', 'クラス本体の「}」');
+  }
+  /* フィールド or メソッド。該当しなければ false（＝文として読み直す） */
+  parseMember(prog, mods, topLevel) {
+    const p = this.save(), line = this.line;
+    const t = this.tryType();
+    if (!t) { this.restore(p); return false; }
+    if (!this.at('IDENT')) { this.restore(p); return false; }
+    const nameTok = this.next();
+    if (this.at('(')) {
+      const params = this.parseParams();
+      while (!this.at('{') && !this.at(';') && !this.at('EOF')) this.next();
+      if (this.accept(';')) throw new JCError(`メソッド ${nameTok.v} に本体がありません`, line);
+      const body = this.parseBlock();
+      if (nameTok.v === 'main') {
+        if (prog.hasMain) throw new JCError('main メソッドが 2 つあります', line);
+        prog.hasMain = true; prog.mainLine = line; prog.main = body.stmts;
+      } else {
+        prog.methods.push({ k: 'method', name: nameTok.v, ret: t, params, body: body.stmts, line, mods });
+      }
+      return true;
+    }
+    if (topLevel) { this.restore(p); return false; }
+    /* フィールド宣言 */
+    this.restore(p); this.tryType();
+    const decl = this.parseVarDeclRest(t, line);
+    this.expect(';', '「;」');
+    decl.isGlobal = true;
+    prog.globals.push(decl);
+    return true;
+  }
+  parseParams() {
+    this.expect('(', '「(」');
+    const params = [];
+    if (!this.at(')')) {
+      do {
+        this.skipModifiers();
+        const line = this.line, t = this.tryType();
+        if (!t) throw new JCError('引数の型を解釈できません', line);
+        const nm = this.expect('IDENT', '引数名');
+        let d = t.d;
+        while (this.at('[') && this.peek(1).t === ']') { this.next(); this.next(); d++; }
+        params.push({ name: nm.v, type: ty(t.b, d), line });
+      } while (this.accept(','));
+    }
+    this.expect(')', '「)」');
+    return params;
+  }
+  parseBlock() {
+    const line = this.line;
+    this.expect('{', '「{」');
+    const stmts = [];
+    while (!this.at('}')) {
+      if (this.at('EOF')) throw new JCError('「}」が足りません', line);
+      stmts.push(this.parseStatement());
+    }
+    this.next();
+    return { k: 'block', stmts, line };
+  }
+
+  parseStatement() {
+    const tok = this.peek(), line = tok.line;
+    switch (tok.t) {
+      case '{': return this.parseBlock();
+      case ';': this.next(); return { k: 'empty', line };
+      case 'if': return this.parseIf();
+      case 'while': return this.parseWhile();
+      case 'do': return this.parseDo();
+      case 'for': return this.parseFor();
+      case 'switch': return this.parseSwitch();
+      case 'return': {
+        this.next();
+        const expr = this.at(';') ? null : this.parseExpr();
+        this.expect(';', '「;」'); return { k: 'return', expr, line };
+      }
+      case 'break': this.next(); this.expect(';', '「;」'); return { k: 'break', line };
+      case 'continue': this.next(); this.expect(';', '「;」'); return { k: 'continue', line };
+      case 'try': case 'throw': case 'synchronized':
+        throw new JCError(`${tok.v} は変換できません`, line);
+      default: break;
+    }
+    this.skipModifiers();
+    const p = this.save(), t = this.tryType();
+    if (t && this.at('IDENT') && [';', '=', ',', '['].includes(this.peek(1).t)) {
+      const decl = this.parseVarDeclRest(t, line);
+      this.expect(';', '「;」');
+      return decl;
+    }
+    this.restore(p);
+    const expr = this.parseExpr();
+    this.expect(';', '「;」');
+    return { k: 'exprStmt', expr, line };
+  }
+  parseVarDeclRest(t, line) {
+    const items = [];
+    do {
+      const nm = this.expect('IDENT', '変数名');
+      let d = t.d;
+      while (this.at('[') && this.peek(1).t === ']') { this.next(); this.next(); d++; }
+      let init = null;
+      if (this.accept('=')) init = this.at('{') ? this.parseArrayInit() : this.parseExpr();
+      items.push({ name: nm.v, type: ty(t.b, d), init, line });
+    } while (this.accept(','));
+    return { k: 'decl', items, line, isGlobal: false };
+  }
+  parseArrayInit() {
+    const line = this.line;
+    this.expect('{', '「{」');
+    const items = [];
+    if (!this.at('}')) {
+      do {
+        if (this.at('}')) break;
+        items.push(this.at('{') ? this.parseArrayInit() : this.parseExpr());
+      } while (this.accept(','));
+    }
+    this.expect('}', '「}」');
+    return { k: 'arrayInit', items, line };
+  }
+  parseParenCond() { this.expect('(', '「(」'); const e = this.parseExpr(); this.expect(')', '「)」'); return e; }
+  parseIf() {
+    const line = this.line; this.next();
+    const cond = this.parseParenCond();
+    const then = this.parseStatement();
+    let els = null;
+    if (this.accept('else')) els = this.parseStatement();
+    return { k: 'if', cond, then, els, line };
+  }
+  parseWhile() {
+    const line = this.line; this.next();
+    const cond = this.parseParenCond();
+    return { k: 'while', cond, body: this.parseStatement(), line };
+  }
+  parseDo() {
+    const line = this.line; this.next();
+    const body = this.parseStatement();
+    const whileLine = this.line;
+    this.expect('while', '「while」');
+    const cond = this.parseParenCond();
+    this.expect(';', '「;」');
+    return { k: 'do', cond, body, line, whileLine };
+  }
+  parseFor() {
+    const line = this.line; this.next();
+    this.expect('(', '「(」');
+    /* 拡張 for: for (int v : arr) */
+    const p = this.save();
+    const t = this.tryType();
+    if (t && this.at('IDENT') && this.peek(1).t === ':') {
+      const nm = this.next(); this.next();
+      const src = this.parseExpr();
+      this.expect(')', '「)」');
+      return { k: 'forEach', varName: nm.v, varType: t, src, body: this.parseStatement(), line };
+    }
+    this.restore(p);
+    let init = null;
+    if (!this.at(';')) {
+      const p2 = this.save(), t2 = this.tryType();
+      if (t2 && this.at('IDENT')) { init = this.parseVarDeclRest(t2, line); }
+      else { this.restore(p2); init = { k: 'exprStmt', expr: this.parseExpr(), line }; }
+    }
+    this.expect(';', '「;」');
+    const cond = this.at(';') ? null : this.parseExpr();
+    this.expect(';', '「;」');
+    const update = [];
+    if (!this.at(')')) { do { update.push(this.parseExpr()); } while (this.accept(',')); }
+    this.expect(')', '「)」');
+    return { k: 'for', init, cond, update, body: this.parseStatement(), line };
+  }
+  parseSwitch() {
+    const line = this.line; this.next();
+    const disc = this.parseParenCond();
+    this.expect('{', '「{」');
+    const cases = [];
+    while (!this.at('}')) {
+      if (this.at('EOF')) throw new JCError('switch の「}」が足りません', line);
+      const labels = []; let isDefault = false;
+      for (;;) {
+        if (this.accept('case')) {
+          labels.push(this.parseExpr());
+          if (this.at('->')) throw new JCError('新しい switch 式（case ... ->）は変換できません。case ...: の形で書いてください', this.line);
+          this.expect(':', '「:」');
+        } else if (this.accept('default')) { isDefault = true; this.expect(':', '「:」'); }
+        else break;
+      }
+      if (!labels.length && !isDefault) {
+        const tok = this.peek();
+        throw new JCError(`switch の中に case / default 以外があります（「${tok.v}」）`, tok.line);
+      }
+      const stmts = [];
+      while (!this.at('case') && !this.at('default') && !this.at('}')) {
+        if (this.at('EOF')) throw new JCError('switch の「}」が足りません', line);
+        stmts.push(this.parseStatement());
+      }
+      cases.push({ labels, isDefault, stmts, line: this.line });
+    }
+    this.next();
+    return { k: 'switch', disc, cases, line };
+  }
+
+  /* 式 */
+  parseExpr() { return this.parseAssign(); }
+  parseAssign() {
+    const left = this.parseTernary();
+    const t = this.peek().t;
+    if (['=', '+=', '-=', '*=', '/=', '%='].includes(t)) {
+      const line = this.line; this.next();
+      const right = this.at('{') ? this.parseArrayInit() : this.parseAssign();
+      return { k: 'assign', op: t, target: left, expr: right, line };
+    }
+    if (['&=', '|=', '^=', '<<=', '>>=', '>>>='].includes(t)) throw new JCError(`演算子 ${t} は変換できません`, this.line);
+    return left;
+  }
+  parseTernary() {
+    const c = this.parseOr();
+    if (this.at('?')) {
+      const line = this.line; this.next();
+      const a = this.parseAssign(); this.expect(':', '「:」');
+      const b = this.parseAssign();
+      return { k: 'ternary', cond: c, a, b, line };
+    }
+    return c;
+  }
+  parseOr() { let l = this.parseAnd(); while (this.at('||')) { const line = this.line; this.next(); l = { k: 'bin', op: '||', l, r: this.parseAnd(), line }; } return l; }
+  parseAnd() { let l = this.parseEq(); while (this.at('&&')) { const line = this.line; this.next(); l = { k: 'bin', op: '&&', l, r: this.parseEq(), line }; } return l; }
+  parseEq() {
+    let l = this.parseRel();
+    while (this.at('==') || this.at('!=')) { const op = this.next(); l = { k: 'bin', op: op.t, l, r: this.parseRel(), line: op.line }; }
+    return l;
+  }
+  parseRel() {
+    let l = this.parseAdd();
+    for (;;) {
+      const t = this.peek().t;
+      if (t === 'instanceof') throw new JCError('instanceof は変換できません', this.line);
+      if (['<', '>', '<=', '>='].includes(t)) { const op = this.next(); l = { k: 'bin', op: op.t, l, r: this.parseAdd(), line: op.line }; }
+      else return l;
+    }
+  }
+  parseAdd() {
+    let l = this.parseMul();
+    for (;;) {
+      const t = this.peek().t;
+      if (t === '+' || t === '-') { const op = this.next(); l = { k: 'bin', op: op.t, l, r: this.parseMul(), line: op.line }; }
+      else return l;
+    }
+  }
+  parseMul() {
+    let l = this.parseUnary();
+    for (;;) {
+      const t = this.peek().t;
+      if (['*', '/', '%'].includes(t)) { const op = this.next(); l = { k: 'bin', op: op.t, l, r: this.parseUnary(), line: op.line }; }
+      else if (['&', '|', '^', '<<', '>>', '>>>'].includes(t)) throw new JCError(`ビット演算子 ${t} は変換できません`, this.line);
+      else return l;
+    }
+  }
+  parseUnary() {
+    const tok = this.peek();
+    if (tok.t === '!') { this.next(); return { k: 'un', op: '!', e: this.parseUnary(), line: tok.line }; }
+    if (tok.t === '-') { this.next(); return { k: 'un', op: '-', e: this.parseUnary(), line: tok.line }; }
+    if (tok.t === '+') { this.next(); return this.parseUnary(); }
+    if (tok.t === '~') throw new JCError('ビット反転 ~ は変換できません', tok.line);
+    if (tok.t === '++' || tok.t === '--') { this.next(); return { k: 'incdec', op: tok.t, prefix: true, e: this.parseUnary(), line: tok.line }; }
+    if (tok.t === '(') {
+      const p = this.save(); this.next();
+      const t = this.tryType();
+      if (t && this.at(')') && t.d === 0 && ['int', 'long', 'short', 'byte', 'double', 'float', 'char'].includes(t.b)) {
+        this.next();
+        return { k: 'cast', type: t, e: this.parseUnary(), line: tok.line };
+      }
+      this.restore(p);
+    }
+    return this.parsePostfix();
+  }
+  parsePostfix() {
+    let n = this.parsePrimary();
+    for (;;) {
+      const tok = this.peek();
+      if (tok.t === '[') { this.next(); const idx = this.parseExpr(); this.expect(']', '「]」'); n = { k: 'index', e: n, idx, line: tok.line }; }
+      else if (tok.t === '.') {
+        this.next();
+        const nm = this.at('IDENT') ? this.next() : this.expect('IDENT', 'メンバ名');
+        if (this.at('(')) n = { k: 'method', obj: n, name: nm.v, args: this.parseArgs(), line: tok.line };
+        else n = { k: 'field', obj: n, name: nm.v, line: tok.line };
+      }
+      else if (tok.t === '++' || tok.t === '--') { this.next(); n = { k: 'incdec', op: tok.t, prefix: false, e: n, line: tok.line }; }
+      else return n;
+    }
+  }
+  parseArgs() {
+    this.expect('(', '「(」');
+    const args = [];
+    if (!this.at(')')) { do { args.push(this.parseExpr()); } while (this.accept(',')); }
+    this.expect(')', '「)」');
+    return args;
+  }
+  parsePrimary() {
+    const tok = this.next();
+    switch (tok.t) {
+      case 'NUM': return { k: 'num', v: tok.v, isInt: tok.isInt, line: tok.line };
+      case 'STR': return { k: 'str', v: tok.v, line: tok.line };
+      case 'CHAR': return { k: 'char', v: tok.v, line: tok.line };
+      case 'true': return { k: 'bool', v: true, line: tok.line };
+      case 'false': return { k: 'bool', v: false, line: tok.line };
+      case 'null': throw new JCError('null は擬似言語に変換できません（未定義 を使う形に書き換えてください）', tok.line);
+      case '(': { const e = this.parseExpr(); this.expect(')', '「)」'); return { k: 'paren', e, line: tok.line }; }
+      case 'new': {
+        const t = this.tryType();
+        if (!t) throw new JCError('new の後の型を解釈できません', tok.line);
+        if (this.at('{')) return { k: 'newArrInit', type: t, init: this.parseArrayInit(), line: tok.line };
+        if (this.at('[')) {
+          const sizes = [];
+          while (this.accept('[')) { sizes.push(this.parseExpr()); this.expect(']', '「]」'); }
+          return { k: 'newArr', type: t, sizes, line: tok.line };
+        }
+        throw new JCError(`オブジェクトの生成（new ${t.b}(...)）は変換できません。配列の new だけに対応しています`, tok.line);
+      }
+      case 'IDENT': {
+        if (this.at('(')) return { k: 'call', name: tok.v, args: this.parseArgs(), line: tok.line };
+        return { k: 'var', name: tok.v, line: tok.line };
+      }
+      case 'this': case 'super': throw new JCError(`${tok.v} は変換できません`, tok.line);
+      default:
+        throw new JCError(`式を解釈できません（${tok.t === 'EOF' ? 'コードの終わり' : '「' + tok.v + '」'}）`, tok.line);
+    }
+  }
+}
+
+/* ---------- 出力 ---------- */
+const P_OR = 1, P_AND = 2, P_CMP = 3, P_ADD = 4, P_MUL = 5, P_UN = 6, P_ATOM = 7;
+const PSEUDO_RESERVED = new Set(['and', 'or', 'not', 'mod', 'true', 'false']);
+const MATH_FN = { abs: 'abs', sqrt: 'sqrt', min: 'min', max: 'max', floor: 'floor', ceil: 'ceil', round: 'round', pow: 'pow' };
+
+function fmtNum(v) {
+  if (!Number.isFinite(v)) throw new JCError('数値が大きすぎます', 0);
+  if (Number.isInteger(v)) return String(v);
+  const s = String(v);
+  if (/e/i.test(s)) return String(parseFloat(v.toFixed(12)));
+  return s;
+}
+
+class Emitter {
+  constructor(prog, src) {
+    this.prog = prog;
+    this.lines = [];
+    this.src = [];
+    this.lastLine = 0;
+    this.warnings = [];
+    this.usesArray = false;
+    this.scopes = [];
+    this.methodRet = new Map();
+    this.rename = new Map();
+    this.used = new Set((src.match(/[A-Za-z_$][A-Za-z0-9_$]*/g) || []));
+    this.comments = [];
+    this.ci = 0;
+    this.tmp = 0;
+  }
+  warn(msg) { if (!this.warnings.includes(msg)) this.warnings.push(msg); }
+  /* 出力した擬似言語の 1 行ごとに、元の Java の行番号を控える（自動トレースで行を戻すため） */
+  out(indent, text, line) {
+    this.lines.push(text ? '  '.repeat(indent) + text : '');
+    this.src.push(line || this.lastLine || 0);
+    if (line) this.lastLine = line;
+  }
+  push(indent, text, line) {
+    this.flushCommentsBefore(line, indent);
+    let t = text;
+    const c = this.takeComment(line);
+    if (c) t += '  // ' + c;
+    this.out(indent, t, line);
+  }
+  raw(indent, text, line) { this.out(indent, text, line); }
+  flushCommentsBefore(line, indent) {
+    while (this.ci < this.comments.length && this.comments[this.ci].line < line) {
+      const c = this.comments[this.ci++];
+      if (c.text) this.out(indent, '// ' + c.text, c.line);
+    }
+  }
+  takeComment(line) {
+    const out = [];
+    while (this.ci < this.comments.length && this.comments[this.ci].line === line) {
+      const c = this.comments[this.ci++];
+      if (c.text) out.push(c.text);
+    }
+    return out.join(' ');
+  }
+  /* 変数名 */
+  safe(name, line) {
+    if (this.rename.has(name)) return this.rename.get(name);
+    if (!PSEUDO_RESERVED.has(name)) return name;
+    let cand = name + '_';
+    while (this.used.has(cand)) cand += '_';
+    this.used.add(cand); this.rename.set(name, cand);
+    this.warn(`変数 ${name} は擬似言語の予約語と重なるため ${cand} に変えました（行 ${line}）`);
+    return cand;
+  }
+  fresh(base) {
+    let cand = base;
+    while (this.used.has(cand)) { this.tmp++; cand = base + this.tmp; }
+    this.used.add(cand); return cand;
+  }
+  /* 型環境 */
+  pushScope() { this.scopes.push(new Map()); }
+  popScope() { this.scopes.pop(); }
+  declare(name, t) { if (this.scopes.length) this.scopes[this.scopes.length - 1].set(name, t); }
+  lookup(name) {
+    for (let i = this.scopes.length - 1; i >= 0; i--) if (this.scopes[i].has(name)) return this.scopes[i].get(name);
+    return null;
+  }
+  typeOf(n) {
+    switch (n.k) {
+      case 'num': return ty(n.isInt ? 'int' : 'double');
+      case 'str': return ty('String');
+      case 'char': return ty('char');
+      case 'bool': return ty('boolean');
+      case 'paren': return this.typeOf(n.e);
+      case 'cast': return n.type;
+      case 'var': return this.lookup(n.name) || UNKNOWN;
+      case 'index': { const t = this.typeOf(n.e); return t.d > 0 ? ty(t.b, t.d - 1) : UNKNOWN; }
+      case 'field': return n.name === 'length' ? ty('int') : UNKNOWN;
+      case 'call': return this.methodRet.get(n.name) || UNKNOWN;
+      case 'method':
+        if (n.obj.k === 'var' && n.obj.name === 'Math') return this.mathRet(n);
+        if (n.name === 'length' && !n.args.length) return ty('int');
+        if (n.name === 'equals') return ty('boolean');
+        return UNKNOWN;
+      case 'un': return n.op === '!' ? ty('boolean') : this.typeOf(n.e);
+      case 'incdec': return this.typeOf(n.e);
+      case 'ternary': { const a = this.typeOf(n.a); return a.b === '?' ? this.typeOf(n.b) : a; }
+      case 'assign': return this.typeOf(n.target);
+      case 'bin': {
+        if (['&&', '||', '==', '!=', '<', '>', '<=', '>='].includes(n.op)) return ty('boolean');
+        const a = this.typeOf(n.l), b = this.typeOf(n.r);
+        if (n.op === '+' && (a.b === 'String' || b.b === 'String')) return ty('String');
+        if (isIntType(a) && isIntType(b)) return ty('int');
+        if ((NUM_REAL.has(a.b) && a.d === 0) || (NUM_REAL.has(b.b) && b.d === 0)) return ty('double');
+        return UNKNOWN;
+      }
+      default: return UNKNOWN;
+    }
+  }
+  mathRet(n) {
+    const f = n.name;
+    if (f === 'abs' || f === 'min' || f === 'max') return n.args.every(a => isIntType(this.typeOf(a))) ? ty('int') : ty('double');
+    if (f === 'floor' || f === 'ceil' || f === 'sqrt' || f === 'pow') return ty('double');
+    if (f === 'round') return ty('int');
+    return UNKNOWN;
+  }
+
+  /* 式の出力: {s, p} */
+  ex(n, minPrec = 0) {
+    const r = this.exp(n);
+    return r.p < minPrec ? '(' + r.s + ')' : r.s;
+  }
+  exp(n) {
+    switch (n.k) {
+      case 'num': return { s: fmtNum(n.v), p: P_ATOM };
+      case 'bool': return { s: n.v ? 'true' : 'false', p: P_ATOM };
+      case 'str': case 'char': {
+        if (n.v.includes('"')) throw new JCError('文字列の中の " は擬似言語で表せません', n.line);
+        let v = n.v;
+        if (/[\n\r\t]/.test(v)) { this.warn(`行 ${n.line}: 文字列の中の改行・タブは空白に置き換えました`); v = v.replace(/[\n\r\t]+/g, ' '); }
+        return { s: '"' + v + '"', p: P_ATOM };
+      }
+      case 'var': return { s: this.safe(n.name, n.line), p: P_ATOM };
+      case 'paren': return this.exp(n.e);
+      case 'cast': {
+        const inner = this.typeOf(n.e);
+        if (NUM_INT.has(n.type.b) && (NUM_REAL.has(inner.b) || inner.b === '?')) return { s: this.ex(n.e, P_ATOM) + ' の小数点以下を切り捨てた値', p: P_UN };
+        return this.exp(n.e);
+      }
+      case 'index': {
+        this.usesArray = true;
+        return { s: this.ex(n.e, P_ATOM) + '[' + this.ex(n.idx, 0) + ']', p: P_ATOM };
+      }
+      case 'field': {
+        if (n.name === 'length') { this.usesArray = true; return { s: this.ex(n.obj, P_ATOM) + ' の要素数', p: P_UN }; }
+        throw new JCError(`フィールド参照 .${n.name} は変換できません`, n.line);
+      }
+      case 'method': {
+        if (n.obj.k === 'var' && n.obj.name === 'Math' && MATH_FN[n.name]) {
+          return { s: MATH_FN[n.name] + '(' + n.args.map(a => this.ex(a, 0)).join(', ') + ')', p: P_ATOM };
+        }
+        if (n.name === 'length' && !n.args.length) return { s: this.ex(n.obj, P_ATOM) + ' の要素数', p: P_UN };
+        if (n.name === 'equals' && n.args.length === 1) {
+          return { s: this.ex(n.obj, P_ADD) + ' = ' + this.ex(n.args[0], P_ADD), p: P_CMP };
+        }
+        throw new JCError(`メソッド呼び出し .${n.name}() は変換できません（擬似言語にオブジェクトのメソッドがないため）。対応しているのは .length() と .equals() だけです`, n.line);
+      }
+      case 'call': {
+        const nm = this.safe(n.name, n.line);
+        return { s: nm + '(' + n.args.map(a => this.ex(a, 0)).join(', ') + ')', p: P_ATOM };
+      }
+      case 'un': {
+        if (n.op === '!') return { s: 'not ' + this.ex(n.e, P_UN), p: P_UN };
+        return { s: '－' + this.ex(n.e, P_UN), p: P_UN };
+      }
+      case 'ternary':
+        throw new JCError('三項演算子（? :）は、代入の右辺全体にあるときだけ if / else に変換できます', n.line);
+      case 'incdec':
+        throw new JCError('式の中の ++ / -- は変換できません（「i++;」のように単独の文にしてください）', n.line);
+      case 'assign':
+        throw new JCError('式の中の代入は変換できません（代入は単独の文にしてください）', n.line);
+      case 'arrayInit': {
+        this.usesArray = true;
+        return { s: '{' + n.items.map(a => this.ex(a, 0)).join(', ') + '}', p: P_ATOM };
+      }
+      case 'newArrInit': { this.usesArray = true; return this.exp(n.init); }
+      case 'newArr': {
+        this.usesArray = true;
+        if (n.sizes.length !== 1) throw new JCError('多次元配列の new は変換できません（1 次元の new だけに対応しています）', n.line);
+        return { s: '{' + this.ex(n.sizes[0], 0) + ' 個の未定義の値}', p: P_ATOM };
+      }
+      case 'bin': return this.binExp(n);
+      default: throw new JCError('内部エラー: 未知の式', n.line);
+    }
+  }
+  binExp(n) {
+    const op = n.op;
+    if (op === '&&') return { s: this.ex(n.l, P_AND) + ' and ' + this.ex(n.r, P_AND + 1), p: P_AND };
+    if (op === '||') return { s: this.ex(n.l, P_OR) + ' or ' + this.ex(n.r, P_OR + 1), p: P_OR };
+    if (['==', '!=', '<', '>', '<=', '>='].includes(op)) {
+      const sym = { '==': '=', '!=': '≠', '<': '＜', '>': '＞', '<=': '≦', '>=': '≧' }[op];
+      if (op === '==' || op === '!=') {
+        const a = this.typeOf(n.l), b = this.typeOf(n.r);
+        if (a.b === 'String' || b.b === 'String') this.warn('文字列の == は「内容が等しいか」として変換しました（Java の == とは意味が違います。equals を使うのが本来です）');
+      }
+      return { s: this.ex(n.l, P_ADD) + ' ' + sym + ' ' + this.ex(n.r, P_ADD), p: P_CMP };
+    }
+    if (op === '+' || op === '-') {
+      const sym = op === '+' ? '＋' : '－';
+      return { s: this.ex(n.l, P_ADD) + ' ' + sym + ' ' + this.ex(n.r, P_ADD + 1), p: P_ADD };
+    }
+    if (op === '*') return { s: this.ex(n.l, P_MUL) + ' × ' + this.ex(n.r, P_MUL + 1), p: P_MUL };
+    if (op === '%') return { s: this.ex(n.l, P_MUL) + ' mod ' + this.ex(n.r, P_MUL + 1), p: P_MUL };
+    if (op === '/') {
+      const intDiv = isIntType(this.typeOf(n.l)) && isIntType(this.typeOf(n.r));
+      const s = this.ex(n.l, P_MUL) + ' ÷ ' + this.ex(n.r, P_MUL + 1);
+      return { s: intDiv ? s + ' の商' : s, p: P_MUL };
+    }
+    throw new JCError(`演算子 ${op} は変換できません`, n.line);
+  }
+
+  /* 代入先 */
+  target(n) {
+    if (n.k === 'paren') return this.target(n.e);
+    if (n.k === 'var') return this.safe(n.name, n.line);
+    if (n.k === 'index') { this.usesArray = true; return this.ex(n.e, P_ATOM) + '[' + this.ex(n.idx, 0) + ']'; }
+    throw new JCError('代入先は変数または配列の要素にしてください', n.line);
+  }
+
+  /* 文 */
+  block(s, indent) {
+    if (s.k === 'block') { this.pushScope(); for (const x of s.stmts) this.stmt(x, indent); this.popScope(); }
+    else this.stmt(s, indent);
+  }
+  stmt(s, indent) {
+    switch (s.k) {
+      case 'empty': return;
+      case 'block': this.block(s, indent); return;
+      case 'decl': {
+        for (const it of s.items) {
+          const nm = this.safe(it.name, it.line);
+          this.declare(it.name, it.type);
+          if (it.type.d > 0) this.usesArray = true;
+          const tn = pseudoTypeName(it.type, it.line);
+          const head = (s.isGlobal ? '大域: ' : '') + tn + ': ' + nm;
+          if (!it.init) { this.push(indent, head, it.line); continue; }
+          if (it.init.k === 'ternary') {
+            this.push(indent, head, it.line);
+            this.ternaryAssign(nm, it.init, indent);
+          } else {
+            this.push(indent, head + ' ← ' + this.ex(it.init, 0), it.line);
+          }
+        }
+        return;
+      }
+      case 'exprStmt': return this.exprStmt(s, indent);
+      case 'return': {
+        this.push(indent, s.expr ? 'return ' + this.ex(s.expr, 0) : 'return', s.line);
+        return;
+      }
+      case 'if': {
+        this.push(indent, 'if (' + this.ex(s.cond, 0) + ')', s.line);
+        this.block(s.then, indent + 1);
+        let els = s.els;
+        while (els && els.k === 'if') {
+          this.push(indent, 'elseif (' + this.ex(els.cond, 0) + ')', els.line);
+          this.block(els.then, indent + 1);
+          els = els.els;
+        }
+        if (els) { this.raw(indent, 'else', els.line); this.block(els, indent + 1); }
+        this.raw(indent, 'endif');
+        return;
+      }
+      case 'while': {
+        this.push(indent, 'while (' + this.ex(s.cond, 0) + ')', s.line);
+        this.block(s.body, indent + 1);
+        this.raw(indent, 'endwhile');
+        return;
+      }
+      case 'do': {
+        this.push(indent, 'do', s.line);
+        this.block(s.body, indent + 1);
+        this.raw(indent, 'while (' + this.ex(s.cond, 0) + ')', s.whileLine || s.line);
+        return;
+      }
+      case 'for': return this.forStmt(s, indent);
+      case 'forEach': return this.forEach(s, indent);
+      case 'switch': return this.switchStmt(s, indent);
+      case 'break': throw new JCError('break は変換できません（擬似言語に break がないため）。ループの条件で抜けるように書き換えてください', s.line);
+      case 'continue': throw new JCError('continue は変換できません（擬似言語に continue がないため）。if で囲む形に書き換えてください', s.line);
+      default: throw new JCError('内部エラー: 未知の文', s.line);
+    }
+  }
+  exprStmt(s, indent) {
+    const e = s.expr;
+    if (e.k === 'incdec') {
+      const t = this.target(e.e);
+      this.push(indent, t + ' ← ' + t + (e.op === '++' ? ' ＋ 1' : ' － 1'), s.line);
+      return;
+    }
+    if (e.k === 'assign') {
+      const t = this.target(e.target);
+      if (e.op === '=') {
+        if (e.expr.k === 'ternary') { this.ternaryAssign(t, e.expr, indent, s.line); return; }
+        this.push(indent, t + ' ← ' + this.ex(e.expr, 0), s.line);
+        return;
+      }
+      const opMap = { '+=': '＋', '-=': '－', '*=': '×', '%=': 'mod' };
+      if (e.op === '/=') {
+        const intDiv = isIntType(this.typeOf(e.target)) && isIntType(this.typeOf(e.expr));
+        this.push(indent, t + ' ← ' + t + ' ÷ ' + this.ex(e.expr, P_MUL + 1) + (intDiv ? ' の商' : ''), s.line);
+        return;
+      }
+      const sym = opMap[e.op];
+      const prec = (e.op === '+=' || e.op === '-=') ? P_ADD + 1 : P_MUL + 1;
+      this.push(indent, t + ' ← ' + t + ' ' + sym + ' ' + this.ex(e.expr, prec), s.line);
+      return;
+    }
+    if (e.k === 'method' && this.isPrintTarget(e)) return this.printStmt(e, indent, s.line);
+    if (e.k === 'call' || e.k === 'method') { this.push(indent, this.ex(e, 0), s.line); return; }
+    throw new JCError('この文は変換できません（代入・メソッド呼び出し・出力の形にしてください）', s.line);
+  }
+  ternaryAssign(targetText, t, indent, line) {
+    const ln = line || t.line;
+    this.push(indent, 'if (' + this.ex(t.cond, 0) + ')', ln);
+    this.raw(indent + 1, targetText + ' ← ' + this.ex(t.a, 0), ln);
+    this.raw(indent, 'else', ln);
+    this.raw(indent + 1, targetText + ' ← ' + this.ex(t.b, 0), ln);
+    this.raw(indent, 'endif', ln);
+  }
+  isPrintTarget(e) {
+    const o = e.obj;
+    return o && o.k === 'field' && o.name === 'out' && o.obj.k === 'var' && o.obj.name === 'System';
+  }
+  printStmt(e, indent, line) {
+    if (e.name === 'printf' || e.name === 'format') {
+      throw new JCError('System.out.printf は変換できません（擬似言語に書式指定がないため）。println に書き換えてください', line);
+    }
+    if (e.name !== 'println' && e.name !== 'print') {
+      throw new JCError(`System.out.${e.name}() は変換できません`, line);
+    }
+    if (!e.args.length) { this.push(indent, '改行を出力する', line); return; }
+    this.push(indent, '出力(' + e.args.map(a => this.ex(a, 0)).join(', ') + ')', line);
+  }
+  forEach(s, indent) {
+    this.usesArray = true;
+    const idx = this.fresh('i_');
+    const arr = this.ex(s.src, P_ATOM);
+    this.pushScope();
+    this.declare(idx, ty('int'));
+    this.declare(s.varName, s.varType);
+    const nm = this.safe(s.varName, s.line);
+    this.push(indent, '整数型: ' + idx, s.line);
+    this.raw(indent, `for (${idx} を 0 から ${arr} の要素数 － 1 まで 1 ずつ増やす)`, s.line);
+    this.raw(indent + 1, pseudoTypeName(s.varType, s.line) + ': ' + nm + ' ← ' + arr + '[' + idx + ']', s.line);
+    this.block(s.body, indent + 1);
+    this.raw(indent, 'endfor');
+    this.popScope();
+    this.warn('拡張 for（for (int x : a)）は要素番号を使う形に変換しました。配列の先頭番号の設定に注意してください');
+  }
+  /* 標準形なら擬似言語の for、そうでなければ while に落とす */
+  forStmt(s, indent) {
+    this.pushScope();
+    const canon = this.canonicalFor(s);
+    if (canon) {
+      const { name, from, to, step, dir } = canon;
+      this.push(indent, '整数型: ' + name, s.line);
+      this.raw(indent, `for (${name} を ${from} から ${to} まで ${step} ずつ${dir > 0 ? '増やす' : '減らす'})`, s.line);
+      this.block(s.body, indent + 1);
+      this.raw(indent, 'endfor');
+      this.popScope();
+      return;
+    }
+    if (s.init) this.stmt(s.init, indent);
+    this.push(indent, 'while (' + (s.cond ? this.ex(s.cond, 0) : 'true') + ')', s.line);
+    this.block(s.body, indent + 1);
+    for (const u of s.update) this.exprStmt({ k: 'exprStmt', expr: u, line: u.line }, indent + 1);
+    this.raw(indent, 'endwhile');
+    this.popScope();
+    this.warn(`行 ${s.line}: for 文が「i を a から b まで n ずつ増やす」の形ではないため、while を使う形に変換しました`);
+  }
+  canonicalFor(s) {
+    if (!s.init || !s.cond || s.update.length !== 1) return null;
+    let name = null, fromNode = null;
+    if (s.init.k === 'decl') {
+      if (s.init.items.length !== 1 || !s.init.items[0].init) return null;
+      const it = s.init.items[0];
+      if (!isIntType(it.type)) return null;
+      name = it.name; fromNode = it.init;
+      this.declare(name, it.type);
+    } else if (s.init.k === 'exprStmt' && s.init.expr.k === 'assign' && s.init.expr.op === '=' && s.init.expr.target.k === 'var') {
+      name = s.init.expr.target.name; fromNode = s.init.expr.expr;
+      if (!isIntType(this.lookup(name) || UNKNOWN)) return null;
+    } else return null;
+
+    const u = s.update[0];
+    let step = null, dir = 0;
+    if (u.k === 'incdec' && u.e.k === 'var' && u.e.name === name) { step = '1'; dir = u.op === '++' ? 1 : -1; }
+    else if (u.k === 'assign' && (u.op === '+=' || u.op === '-=') && u.target.k === 'var' && u.target.name === name) {
+      if (!isIntType(this.typeOf(u.expr))) return null;
+      step = this.ex(u.expr, P_ATOM); dir = u.op === '+=' ? 1 : -1;
+    } else return null;
+
+    const c = s.cond;
+    if (c.k !== 'bin' || !['<', '<=', '>', '>='].includes(c.op)) return null;
+    if (c.l.k !== 'var' || c.l.name !== name) return null;
+    if (this.mentions(c.r, name) || this.mentions(fromNode, name)) return null;
+    if (this.assignsTo(s.body, name)) return null;
+
+    const nm = this.safe(name, s.line);
+    const from = this.ex(fromNode, P_ADD);
+    let to;
+    if ((c.op === '<' && dir > 0) || (c.op === '>' && dir < 0)) {
+      if (step !== '1') return null;
+      const delta = c.op === '<' ? -1 : 1;
+      to = (c.r.k === 'num' && c.r.isInt) ? fmtNum(c.r.v + delta) : this.ex(c.r, P_MUL) + (delta < 0 ? ' － 1' : ' ＋ 1');
+    } else if ((c.op === '<=' && dir > 0) || (c.op === '>=' && dir < 0)) {
+      to = this.ex(c.r, P_ADD);
+    } else return null;
+    return { name: nm, from, to, step, dir };
+  }
+  mentions(n, name) {
+    if (!n || typeof n !== 'object') return false;
+    if (n.k === 'var' && n.name === name) return true;
+    for (const key of Object.keys(n)) {
+      const v = n[key];
+      if (Array.isArray(v)) { for (const x of v) if (this.mentions(x, name)) return true; }
+      else if (v && typeof v === 'object' && this.mentions(v, name)) return true;
+    }
+    return false;
+  }
+  assignsTo(n, name) {
+    if (!n || typeof n !== 'object') return false;
+    if ((n.k === 'assign' || n.k === 'incdec')) {
+      const t = n.k === 'assign' ? n.target : n.e;
+      if (t && t.k === 'var' && t.name === name) return true;
+    }
+    for (const key of Object.keys(n)) {
+      const v = n[key];
+      if (Array.isArray(v)) { for (const x of v) if (this.assignsTo(x, name)) return true; }
+      else if (v && typeof v === 'object' && this.assignsTo(v, name)) return true;
+    }
+    return false;
+  }
+  switchStmt(s, indent) {
+    const cases = s.cases;
+    for (let i = 0; i < cases.length; i++) {
+      const c = cases[i];
+      const body = c.stmts.filter(x => x.k !== 'empty');
+      const last = body[body.length - 1];
+      const ends = last && (last.k === 'break' || last.k === 'return');
+      if (!body.length && i < cases.length - 1) continue; /* ラベルの連続はまとめる */
+      if (!ends && i < cases.length - 1) {
+        throw new JCError('switch の case が break / return で終わっていません（フォールスルーは変換できません）', c.line);
+      }
+    }
+    const disc = this.ex(s.disc, P_ADD);
+    let first = true, defaultCase = null;
+    let pending = [];
+    const emitted = [];
+    for (const c of cases) {
+      pending.push(...c.labels);
+      const body = c.stmts.filter(x => x.k !== 'empty');
+      if (c.isDefault && !body.length && !c.labels.length) continue;
+      if (!body.length) continue;
+      if (c.isDefault) { defaultCase = { body, line: c.line }; pending = []; continue; }
+      emitted.push({ labels: pending, body, line: c.line });
+      pending = [];
+    }
+    if (!emitted.length && !defaultCase) { this.warn(`行 ${s.line}: 中身のない switch を省略しました`); return; }
+    for (const e of emitted) {
+      const cond = e.labels.map(l => disc + ' = ' + this.ex(l, P_ADD)).join(' or ');
+      this.push(indent, (first ? 'if (' : 'elseif (') + cond + ')', e.line);
+      first = false;
+      this.pushScope();
+      for (const x of e.body) if (x.k !== 'break') this.stmt(x, indent + 1);
+      this.popScope();
+    }
+    if (defaultCase) {
+      if (first) { this.push(indent, 'if (true)', defaultCase.line); first = false; }
+      else this.raw(indent, 'else');
+      this.pushScope();
+      for (const x of defaultCase.body) if (x.k !== 'break') this.stmt(x, indent + 1);
+      this.popScope();
+    }
+    this.raw(indent, 'endif');
+    this.warn('switch を if / elseif に変換しました（break は取り除いています）');
+  }
+
+  run(comments) {
+    this.comments = comments.slice().sort((a, b) => a.line - b.line);
+    const prog = this.prog;
+    for (const m of prog.methods) this.methodRet.set(m.name, m.ret);
+    this.pushScope();
+    for (const g of prog.globals) {
+      g.isGlobal = true;
+      for (const it of g.items) this.declare(it.name, it.type);
+    }
+    for (const g of prog.globals) this.stmt(g, 0);
+    for (const m of prog.methods) {
+      const head = m.ret.b === 'void' ? `○${this.safe(m.name, m.line)}(` : `○${pseudoTypeName(m.ret, m.line)}: ${this.safe(m.name, m.line)}(`;
+      const ps = m.params.map(p => pseudoTypeName(p.type, p.line) + ': ' + this.safe(p.name, p.line)).join(', ');
+      this.push(0, head + ps + ')', m.line);
+      this.pushScope();
+      for (const p of m.params) { this.declare(p.name, p.type); if (p.type.d > 0) this.usesArray = true; }
+      if (!m.body.length) this.raw(1, 'return', m.line);
+      for (const st of m.body) this.stmt(st, 1);
+      this.popScope();
+    }
+    this.pushScope();
+    for (const st of prog.main) this.stmt(st, 0);
+    this.popScope();
+    this.popScope();
+    while (this.ci < this.comments.length) { const c = this.comments[this.ci++]; if (c.text) this.out(0, '// ' + c.text, c.line); }
+    /* 末尾の空行は lines と src をそろえて落とす（行マップがずれないように） */
+    while (this.lines.length && !this.lines[this.lines.length - 1].trim()) { this.lines.pop(); this.src.pop(); }
+    return this.lines.join('\n') + '\n';
+  }
+}
+
+/* ---------- 入口 ---------- */
+function convert(javaSource) {
+  const src = String(javaSource || '');
+  if (!src.trim()) throw new JCError('コードが空です', 0);
+  const { toks, comments } = tokenize(src);
+  const prog = new Parser(toks).parseProgram();
+  if (!prog.main.length && !prog.methods.length && !prog.globals.length) throw new JCError('変換できる文が見つかりません', 0);
+  const em = new Emitter(prog, src);
+  const code = em.run(comments);
+  const entry = (!prog.main.length && prog.methods.length) ? prog.methods[0] : null;
+  return {
+    code,
+    warnings: em.warnings,
+    usesArray: em.usesArray,
+    hasMain: prog.hasMain || prog.main.length > 0,
+    entryHint: entry ? entry.name + '(' + entry.params.map(p => p.name).join(', ') + ')' : '',
+    /* 擬似言語の n 行目 → 元の Java の行番号（lineMap[n - 1]） */
+    lineMap: em.src.slice()
+  };
+}
+
+function errorMessage(e) {
+  if (e instanceof JCError) return (e.line ? `行 ${e.line}: ` : '') + e.message;
+  return '内部エラー: ' + (e && e.message ? e.message : String(e));
+}
+
+return { convert, errorMessage, JCError };
+})();
+</script>
+<script>
+/* ===== 擬似言語 → Java 変換器 ===== */
+/* PseudoLang.parse() の構文木をそのまま入力に使う（Java 用のパーサは書かない） */
+const PseudoToJava = (() => {
+'use strict';
+
+class PJError extends Error { constructor(msg, line) { super(msg); this.name = 'PJError'; this.line = line; } }
+
+const JAVA_RESERVED = new Set(['abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char', 'class',
+  'const', 'continue', 'default', 'do', 'double', 'else', 'enum', 'extends', 'final', 'finally', 'float', 'for',
+  'goto', 'if', 'implements', 'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new', 'package',
+  'private', 'protected', 'public', 'return', 'short', 'static', 'strictfp', 'super', 'switch', 'synchronized',
+  'this', 'throw', 'throws', 'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null',
+  'String', 'Math', 'System', 'Main', 'args']);
+
+/* 型 */
+const BASE = { '整数型': 'int', '実数型': 'double', '文字列型': 'String', '文字型': 'char', '論理型': 'boolean' };
+const UNK = { b: '?', d: 0 };
+function ty(b, d = 0) { return { b, d }; }
+function typeName(t) { return (t.b === '?' ? 'int' : t.b) + '[]'.repeat(t.d); }
+function isInt(t) { return t.d === 0 && t.b === 'int'; }
+function isNum(t) { return t.d === 0 && (t.b === 'int' || t.b === 'double'); }
+
+/* 演算子の優先順位（Java） */
+const P_OR = 1, P_AND = 2, P_EQ = 3, P_REL = 4, P_ADD = 5, P_MUL = 6, P_UN = 7, P_ATOM = 8;
+
+function fmtNum(v) {
+  if (Number.isInteger(v)) return String(v);
+  const s = String(v);
+  return /e/i.test(s) ? String(parseFloat(v.toFixed(12))) : s;
+}
+function quote(s, line) {
+  if (/[\n\r]/.test(s)) throw new PJError('文字列の中に改行があります', line);
+  return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\t/g, '\\t') + '"';
+}
+
+/* ---------- 宣言の型文字列を元のコードから取り出す（配列の次元は構文木に残らないため） ---------- */
+const DECL_RE = /^(大域\s*:\s*)?([^\s:()]*型[^\s:()]*)\s*:/;
+const FUNC_RE = /^○\s*(?:([^\s:()]*型[^\s:()]*)\s*:\s*)?([^\s:()]+)\s*\((.*)\)\s*$/;
+const PARAM_RE = /^([^\s:()]*型[^\s:()]*)\s*:\s*(\S+)$/;
+function dimsOf(typeStr) { return (String(typeStr).match(/配列/g) || []).length; }
+function baseOf(typeStr, line) {
+  const m = String(typeStr).match(/(整数|実数|文字列|文字|論理)型/);
+  if (!m) throw new PJError(`型「${typeStr}」は Java に変換できません`, line);
+  return BASE[m[0]];
+}
+function splitTop(s, sep) {
+  const parts = []; let depth = 0, inStr = false, cur = '';
+  for (const ch of s) {
+    if (inStr) { cur += ch; if (ch === '"') inStr = false; continue; }
+    if (ch === '"') { inStr = true; cur += ch; continue; }
+    if ('([{'.includes(ch)) depth++; else if (')]}'.includes(ch)) depth--;
+    if (ch === sep && depth === 0) { parts.push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  parts.push(cur); return parts;
+}
+function buildTypeIndex(P) {
+  const byLine = new Map();
+  for (const l of P.lines) if (!byLine.has(l.n)) byLine.set(l.n, l.text);
+  const declDims = new Map();   // 行番号 -> 配列の次元
+  const funcSig = new Map();    // 関数名 -> { retDims, params: [dims] }
+  for (const [n, text] of byLine) {
+    const dm = text.match(DECL_RE);
+    if (dm) { declDims.set(n, dimsOf(dm[2])); continue; }
+    const fm = text.match(FUNC_RE);
+    if (fm) {
+      const params = splitTop(fm[3], ',').map(p => p.trim()).filter(Boolean).map(p => {
+        const pm = p.match(PARAM_RE);
+        return pm ? dimsOf(pm[1]) : 0;
+      });
+      funcSig.set(fm[2], { retDims: fm[1] ? dimsOf(fm[1]) : 0, params });
+    }
+  }
+  return { declDims, funcSig };
+}
+
+/* ---------- 変換本体 ---------- */
+class Emitter {
+  constructor(P, opts) {
+    this.P = P;
+    this.base = opts.arrayBase === 0 ? 0 : 1;
+    this.className = opts.className || 'Main';
+    this.entryCall = (opts.entryCall || '').trim();
+    this.idx = buildTypeIndex(P);
+    this.warnings = [];
+    this.helpers = new Map();   // Java の要素型 -> ヘルパー名
+    this.rename = new Map();
+    this.funcRet = new Map();
+    this.out = [];
+    this.shifted = false;
+  }
+  warn(m) { if (!this.warnings.includes(m)) this.warnings.push(m); }
+  line(indent, text) { this.out.push(text ? '    '.repeat(indent) + text : ''); }
+
+  name(n, line) {
+    if (this.rename.has(n)) return this.rename.get(n);
+    if (!JAVA_RESERVED.has(n)) return n;
+    const cand = n + '_';
+    this.rename.set(n, cand);
+    this.warn(`${n} は Java の予約語と重なるため ${cand} に変えました（行 ${line || '?'}）`);
+    return cand;
+  }
+
+  /* --- 型 --- */
+  lookup(n) {
+    for (let i = this.scopes.length - 1; i >= 0; i--) if (this.scopes[i].has(n)) return this.scopes[i].get(n);
+    return null;
+  }
+  infer(e) {
+    if (!e) return UNK;
+    switch (e.k) {
+      case 'lit': {
+        const v = e.v;
+        if (typeof v === 'number') return ty(Number.isInteger(v) ? 'int' : 'double');
+        if (typeof v === 'string') return ty('String');
+        if (typeof v === 'boolean') return ty('boolean');
+        return UNK;
+      }
+      case 'var': return this.lookup(e.name) || UNK;
+      case 'arr': {
+        if (!e.items.length) return UNK;
+        const t = this.infer(e.items[0]);
+        return t.b === '?' ? UNK : ty(t.b, t.d + 1);
+      }
+      case 'arrundef': return UNK;
+      case 'index': { const t = this.infer(e.e); return t.d >= e.idx.length ? ty(t.b, t.d - e.idx.length) : UNK; }
+      case 'len': return ty('int');
+      case 'round': return ty('int');
+      case 'pow': return ty('double');
+      case 'quot': return ty('int');
+      case 'rem': { const a = this.infer(e.l), b = this.infer(e.r); return (isInt(a) && isInt(b)) ? ty('int') : ty('double'); }
+      case 'not': case 'isundef': case 'isdef': case 'divisible': return ty('boolean');
+      case 'neg': { const t = this.infer(e.e); return isNum(t) ? t : ty('int'); }
+      case 'call': return this.funcRet.get(e.name) || UNK;
+      case 'bin': {
+        if (['and', 'or', '=', '!=', '<', '>', '<=', '>='].includes(e.op)) return ty('boolean');
+        const a = this.infer(e.l), b = this.infer(e.r);
+        if (e.op === '+' && (a.b === 'String' || b.b === 'String')) return ty('String');
+        if (e.op === '/') return ty('double');
+        if (isInt(a) && isInt(b)) return ty('int');
+        if (a.b === 'double' || b.b === 'double') return ty('double');
+        return (a.b !== '?') ? a : b;
+      }
+      default: return UNK;
+    }
+  }
+
+  /* --- 式 --- */
+  ex(e, minPrec = 0) {
+    const r = this.exp(e);
+    return r.p < minPrec ? '(' + r.s + ')' : r.s;
+  }
+  exp(e) {
+    switch (e.k) {
+      case 'lit': {
+        const v = e.v;
+        if (v === undefined) throw new PJError('「未定義」は Java の数値型では表せません', e.line);
+        if (typeof v === 'number') return { s: fmtNum(v), p: P_ATOM };
+        if (typeof v === 'boolean') return { s: v ? 'true' : 'false', p: P_ATOM };
+        return { s: quote(v), p: P_ATOM };
+      }
+      case 'var': return { s: this.name(e.name), p: P_ATOM };
+      case 'call': return { s: this.name(e.name) + '(' + e.args.map(a => this.ex(a, 0)).join(', ') + ')', p: P_ATOM };
+      case 'arr': {
+        const t = this.infer(e);
+        const inner = e.items.map(a => this.ex(a, 0)).join(', ');
+        return { s: 'new ' + typeName(t.b === '?' ? ty('int', 1) : t) + '{' + inner + '}', p: P_ATOM };
+      }
+      case 'arrundef': return { s: 'new int[' + this.ex(e.n, 0) + ']', p: P_ATOM };
+      case 'index': {
+        let s = this.ex(e.e, P_ATOM);
+        for (const ix of e.idx) s += '[' + this.shiftIndex(ix) + ']';
+        return { s, p: P_ATOM };
+      }
+      case 'len': {
+        const t = this.infer(e.e);
+        if (t.b === 'String' && t.d === 0) return { s: this.ex(e.e, P_ATOM) + '.length()', p: P_ATOM };
+        if (t.d === 0 && t.b !== '?') throw new PJError('要素数を取れるのは配列か文字列だけです', e.line);
+        return { s: this.ex(e.e, P_ATOM) + '.length', p: P_ATOM };
+      }
+      case 'round': {
+        const fn = e.mode === 'CEIL' ? 'Math.ceil' : e.mode === 'FLOOR' ? 'Math.floor' : 'Math.round';
+        return { s: '(int) ' + fn + '(' + this.ex(e.e, 0) + ')', p: P_UN };
+      }
+      case 'pow': return { s: 'Math.pow(' + this.ex(e.base, 0) + ', ' + this.ex(e.exp, 0) + ')', p: P_ATOM };
+      case 'quot': {
+        const a = this.infer(e.l), b = this.infer(e.r);
+        const s = this.ex(e.l, P_MUL) + ' / ' + this.ex(e.r, P_MUL + 1);
+        if (isInt(a) && isInt(b)) return { s, p: P_MUL };
+        return { s: '(int) (' + s + ')', p: P_UN };
+      }
+      case 'rem': return { s: this.ex(e.l, P_MUL) + ' % ' + this.ex(e.r, P_MUL + 1), p: P_MUL };
+      case 'not': return { s: '!' + this.ex(e.e, P_UN), p: P_UN };
+      case 'neg': return { s: '-' + this.ex(e.e, P_UN), p: P_UN };
+      case 'isundef': case 'isdef': {
+        const t = this.infer(e.e);
+        if (t.d === 0 && ['int', 'double', 'char', 'boolean'].includes(t.b)) {
+          throw new PJError('「未定義」の判定は Java の数値型・論理型では書けません（Java に未定義の値がないため）', e.line);
+        }
+        return { s: this.ex(e.e, P_EQ) + (e.k === 'isundef' ? ' == null' : ' != null'), p: P_EQ };
+      }
+      case 'divisible': {
+        const l = this.ex(e.l, P_MUL);
+        const parts = e.rs.map(r => l + ' % ' + this.ex(r, P_MUL + 1) + ' == 0');
+        const s = parts.join(' && ');
+        if (e.neg) return { s: '!(' + s + ')', p: P_UN };
+        return parts.length > 1 ? { s, p: P_AND } : { s, p: P_EQ };
+      }
+      case 'bin': return this.bin(e);
+      default: throw new PJError('内部エラー: 未知の式', e.line);
+    }
+  }
+  bin(e) {
+    const op = e.op;
+    if (op === 'or') return { s: this.ex(e.l, P_OR) + ' || ' + this.ex(e.r, P_OR + 1), p: P_OR };
+    if (op === 'and') return { s: this.ex(e.l, P_AND) + ' && ' + this.ex(e.r, P_AND + 1), p: P_AND };
+    if (op === '=' || op === '!=') {
+      const a = this.infer(e.l), b = this.infer(e.r);
+      const isStr = (a.b === 'String' && a.d === 0) || (b.b === 'String' && b.d === 0);
+      if (isStr) {
+        const s = this.ex(e.l, P_ATOM) + '.equals(' + this.ex(e.r, 0) + ')';
+        return op === '=' ? { s, p: P_ATOM } : { s: '!' + s, p: P_UN };
+      }
+      if (a.d > 0 || b.d > 0) this.warn('配列どうしの比較は Java では中身ではなく参照の比較になります。Arrays.equals を使ってください');
+      return { s: this.ex(e.l, P_EQ) + (op === '=' ? ' == ' : ' != ') + this.ex(e.r, P_EQ + 1), p: P_EQ };
+    }
+    if (['<', '>', '<=', '>='].includes(op)) {
+      return { s: this.ex(e.l, P_REL) + ' ' + op + ' ' + this.ex(e.r, P_REL + 1), p: P_REL };
+    }
+    if (op === '+' || op === '-') {
+      return { s: this.ex(e.l, P_ADD) + ' ' + op + ' ' + this.ex(e.r, P_ADD + 1), p: P_ADD };
+    }
+    if (op === '*') return { s: this.ex(e.l, P_MUL) + ' * ' + this.ex(e.r, P_MUL + 1), p: P_MUL };
+    if (op === 'mod') return { s: this.ex(e.l, P_MUL) + ' % ' + this.ex(e.r, P_MUL + 1), p: P_MUL };
+    if (op === '/') {
+      /* 擬似言語の ÷ は実数除算。Java の int どうしの / は切り捨てなのでキャストが要る */
+      const a = this.infer(e.l), b = this.infer(e.r);
+      if (isInt(a) && isInt(b)) {
+        this.shifted = true;
+        return { s: '(double) ' + this.ex(e.l, P_UN) + ' / ' + this.ex(e.r, P_MUL + 1), p: P_MUL };
+      }
+      return { s: this.ex(e.l, P_MUL) + ' / ' + this.ex(e.r, P_MUL + 1), p: P_MUL };
+    }
+    throw new PJError(`演算子 ${op} は変換できません`, e.line);
+  }
+  /* 擬似言語が 1 始まりなら Java の 0 始まりに直す */
+  shiftIndex(n) {
+    if (this.base === 0) return this.ex(n, 0);
+    this.usedShift = true;
+    if (n.k === 'lit' && typeof n.v === 'number') return fmtNum(n.v - 1);
+    if (n.k === 'bin' && n.op === '+' && n.r.k === 'lit' && n.r.v === 1) return this.ex(n.l, 0);
+    if (n.k === 'bin' && n.op === '+' && n.l.k === 'lit' && n.l.v === 1) return this.ex(n.r, 0);
+    if (n.k === 'bin' && n.op === '-' && n.r.k === 'lit' && typeof n.r.v === 'number') {
+      return this.ex(n.l, P_ADD) + ' - ' + fmtNum(n.r.v + 1);
+    }
+    return this.ex(n, P_ADD) + ' - 1';
+  }
+  /* 右辺を左辺の型に合わせる（整数型 ← 実数 のときは擬似言語と同じく切り捨て） */
+  coerce(text, target, src, prec) {
+    if (isInt(target) && src.b === 'double' && src.d === 0) return '(int) ' + (prec >= P_UN ? text : '(' + text + ')');
+    if (target.b === 'double' && isInt(src)) return text;
+    return text;
+  }
+  assignText(targetText, targetType, expr) {
+    const r = this.exp(expr);
+    const src = this.infer(expr);
+    return targetText + ' = ' + this.coerce(r.s, targetType, src, r.p);
+  }
+
+  /* --- 宣言の収集（Java はブロックスコープなので、入れ子の宣言は先頭に出す） --- */
+  scanDecls(stmts, depth, acc) {
+    for (const s of stmts) {
+      switch (s.k) {
+        case 'decl': {
+          const dims = this.idx.declDims.get(s.line);
+          const t = ty(baseOf(s.type, s.line), dims === undefined ? (s.isArray ? 1 : 0) : dims);
+          for (const it of s.items) acc.set(it.name, { type: t, depth: Math.min(depth, acc.has(it.name) ? acc.get(it.name).depth : depth) });
+          break;
+        }
+        case 'if':
+          for (const b of s.branches) this.scanDecls(b.body, depth + 1, acc);
+          if (s.elseBody) this.scanDecls(s.elseBody, depth + 1, acc);
+          break;
+        case 'while': case 'for': this.scanDecls(s.body, depth + 1, acc); break;
+        case 'dowhile': this.scanDecls(s.body, depth + 1, acc); break;
+        default: break;
+      }
+    }
+  }
+  /* 宣言なしで代入されている変数（擬似言語は許すが Java は許さない） */
+  scanImplicit(stmts, declared, acc) {
+    /* 大域変数と引数は既に見えているので、ここで作り直すと static フィールドを隠してしまう */
+    const known = n => declared.has(n) || !!this.lookup(n) || acc.has(n);
+    const visit = list => {
+      for (const s of list) {
+        if (s.k === 'assign' && !s.target.idx && !known(s.target.name)) {
+          acc.set(s.target.name, this.infer(s.expr));
+        }
+        if (s.k === 'for' && !known(s.varName)) acc.set(s.varName, ty('int'));
+        if (s.k === 'if') { for (const b of s.branches) visit(b.body); if (s.elseBody) visit(s.elseBody); }
+        if (s.k === 'while' || s.k === 'for' || s.k === 'dowhile') visit(s.body);
+      }
+    };
+    visit(stmts);
+  }
+
+  /* --- 文 --- */
+  stmts(list, indent) { for (const s of list) this.stmt(s, indent); }
+  stmt(s, indent) {
+    switch (s.k) {
+      case 'decl': {
+        const dims = this.idx.declDims.get(s.line);
+        const t = ty(baseOf(s.type, s.line), dims === undefined ? (s.isArray ? 1 : 0) : dims);
+        for (const it of s.items) {
+          this.declare(it.name, t);
+          const nm = this.name(it.name, s.line);
+          const hoisted = this.hoisted.has(it.name);
+          if (!it.init) { if (!hoisted) this.line(indent, typeName(t) + ' ' + nm + ';'); continue; }
+          const head = hoisted ? nm : typeName(t) + ' ' + nm;
+          if (it.init.k === 'arr' && it.init.items.length) {
+            /* 宣言と同時なら new を省いた { … } が使える */
+            const inner = it.init.items.map(a => this.ex(a, 0)).join(', ');
+            this.line(indent, head + ' = ' + (hoisted ? 'new ' + typeName(t) : '') + '{' + inner + '};');
+          } else if (it.init.k === 'arrundef') {
+            this.line(indent, head + ' = new ' + t.b + '[' + this.ex(it.init.n, 0) + ']' + '[]'.repeat(Math.max(0, t.d - 1)) + ';');
+            this.warn('「n 個の未定義の値」は Java では 0（文字列なら null）で埋めた配列になります');
+          } else {
+            this.line(indent, this.assignText(head, t, it.init) + ';');
+          }
+        }
+        return;
+      }
+      case 'assign': {
+        if (!s.target.idx) {
+          const t = this.lookup(s.target.name) || UNK;
+          this.line(indent, this.assignText(this.name(s.target.name, s.line), t, s.expr) + ';');
+          return;
+        }
+        const at = this.lookup(s.target.name) || UNK;
+        const elem = at.d >= s.target.idx.length ? ty(at.b, at.d - s.target.idx.length) : UNK;
+        let lhs = this.name(s.target.name, s.line);
+        for (const ix of s.target.idx) lhs += '[' + this.shiftIndex(ix) + ']';
+        this.line(indent, this.assignText(lhs, elem, s.expr) + ';');
+        return;
+      }
+      case 'append': {
+        const at = this.lookup(s.name) || UNK;
+        if (at.d < 1) throw new PJError(`${s.name} は配列ではないので「末尾に追加する」を変換できません`, s.line);
+        const elem = ty(at.b, at.d - 1);
+        const fn = this.helper(elem);
+        const nm = this.name(s.name, s.line);
+        this.line(indent, nm + ' = ' + fn + '(' + nm + ', ' + this.ex(s.expr, 0) + ');');
+        return;
+      }
+      case 'print': {
+        if (s.newline) { this.line(indent, 'System.out.println();'); return; }
+        if (!s.exprs.length) { this.line(indent, 'System.out.println();'); return; }
+        if (s.exprs.length === 1) { this.line(indent, 'System.out.println(' + this.ex(s.exprs[0], 0) + ');'); return; }
+        const parts = s.exprs.map(e => this.ex(e, P_ADD + 1));
+        let text;
+        if (s.sep) text = parts.join(' + ' + quote(s.sep) + ' + ');
+        else text = parts.join(' + ');
+        if (parts.length > 1 && !s.sep && this.infer(s.exprs[0]).b !== 'String') text = '"" + ' + text;
+        this.line(indent, 'System.out.println(' + text + ');');
+        return;
+      }
+      case 'call': this.line(indent, this.ex(s.expr, 0) + ';'); return;
+      case 'return': this.line(indent, s.expr ? 'return ' + this.retExpr(s.expr) + ';' : 'return;'); return;
+      case 'if': {
+        s.branches.forEach((b, i) => {
+          this.line(indent, (i === 0 ? 'if (' : '} else if (') + this.ex(b.cond, 0) + ') {');
+          this.stmts(b.body, indent + 1);
+        });
+        if (s.elseBody) { this.line(indent, '} else {'); this.stmts(s.elseBody, indent + 1); }
+        this.line(indent, '}');
+        return;
+      }
+      case 'while': {
+        this.line(indent, 'while (' + this.ex(s.cond, 0) + ') {');
+        this.stmts(s.body, indent + 1);
+        this.line(indent, '}');
+        return;
+      }
+      case 'dowhile': {
+        this.line(indent, 'do {');
+        this.stmts(s.body, indent + 1);
+        this.line(indent, '} while (' + this.ex(s.cond, 0) + ');');
+        return;
+      }
+      case 'for': {
+        const known = this.lookup(s.varName);
+        if (!known) this.declare(s.varName, ty('int'));
+        const nm = this.name(s.varName, s.line);
+        const declareInline = !known && !this.hoisted.has(s.varName);
+        const from = this.ex(s.from, 0);
+        /* 「n － 1 まで」は Java では i < n の形にした方が読みやすい */
+        let to, cmp;
+        const t = s.to;
+        if (s.dir > 0 && t.k === 'bin' && t.op === '-' && t.r.k === 'lit' && t.r.v === 1) {
+          to = this.ex(t.l, P_REL + 1); cmp = ' < ';
+        } else if (s.dir < 0 && t.k === 'bin' && t.op === '+' && t.r.k === 'lit' && t.r.v === 1) {
+          to = this.ex(t.l, P_REL + 1); cmp = ' > ';
+        } else {
+          to = this.ex(t, P_REL + 1); cmp = s.dir > 0 ? ' <= ' : ' >= ';
+        }
+        let step;
+        if (!s.step || (s.step.k === 'lit' && s.step.v === 1)) step = s.dir > 0 ? nm + '++' : nm + '--';
+        else step = nm + (s.dir > 0 ? ' += ' : ' -= ') + this.ex(s.step, P_ADD + 1);
+        this.line(indent, `for (${declareInline ? 'int ' : ''}${nm} = ${from}; ${nm}${cmp}${to}; ${step}) {`);
+        this.stmts(s.body, indent + 1);
+        this.line(indent, '}');
+        if (declareInline) this.warn(`ループ変数 ${s.varName} は擬似言語側で宣言されていないため、for の中だけで使える変数にしました（行 ${s.line}）`);
+        return;
+      }
+      default: throw new PJError('内部エラー: 未知の文', s.line);
+    }
+  }
+  retExpr(e) {
+    const r = this.exp(e);
+    return this.coerce(r.s, this.curRet || UNK, this.infer(e), r.p);
+  }
+  helper(elem) {
+    const key = typeName(elem);
+    if (this.helpers.has(key)) return this.helpers.get(key);
+    const suffix = key.replace(/\[\]/g, 'Array');
+    const fn = 'append' + suffix.charAt(0).toUpperCase() + suffix.slice(1);
+    this.helpers.set(key, fn);
+    return fn;
+  }
+  declare(n, t) { this.scopes[this.scopes.length - 1].set(n, t); }
+
+  /* --- 関数 / main --- */
+  emitBody(stmts, indent, retType) {
+    this.curRet = retType || UNK;
+    const decls = new Map();
+    this.scanDecls(stmts, 0, decls);
+    const implicit = new Map();
+    this.scanImplicit(stmts, new Set(decls.keys()), implicit);
+
+    this.hoisted = new Set();
+    for (const [n, info] of decls) if (info.depth > 0) this.hoisted.add(n);
+    for (const [n] of implicit) this.hoisted.add(n);
+
+    /* 先に型を登録してから本体を出す（前方参照でも型推論が効くように） */
+    for (const [n, info] of decls) this.declare(n, info.type);
+    for (const [n, t] of implicit) this.declare(n, t.b === '?' ? ty('int') : t);
+
+    for (const n of this.hoisted) {
+      const t = this.lookup(n) || ty('int');
+      this.line(indent, typeName(t) + ' ' + this.name(n) + ';');
+    }
+    if (this.hoisted.size) {
+      this.warn('ブロックの中で宣言された変数や、宣言なしで使われている変数は、Java のスコープに合わせてメソッドの先頭でまとめて宣言しました');
+      this.line(indent, '');
+    }
+    this.stmts(stmts, indent);
+  }
+
+  run() {
+    const P = this.P;
+    this.scopes = [new Map()];
+
+    for (const name of Object.keys(P.functions)) {
+      const fn = P.functions[name];
+      const sig = this.idx.funcSig.get(name) || { retDims: 0, params: [] };
+      this.funcRet.set(name, fn.retType ? ty(baseOf(fn.retType, fn.line), sig.retDims) : ty('void'));
+    }
+
+    /* 大域変数 */
+    const globalScope = this.scopes[0];
+    for (const g of P.globals) {
+      const dims = this.idx.declDims.get(g.line);
+      const t = ty(baseOf(g.type, g.line), dims === undefined ? (g.isArray ? 1 : 0) : dims);
+      for (const it of g.items) globalScope.set(it.name, t);
+    }
+
+    const body = [];
+    const save = this.out;
+
+    /* static フィールド */
+    this.out = [];
+    for (const g of P.globals) {
+      const dims = this.idx.declDims.get(g.line);
+      const t = ty(baseOf(g.type, g.line), dims === undefined ? (g.isArray ? 1 : 0) : dims);
+      for (const it of g.items) {
+        const nm = this.name(it.name, g.line);
+        if (!it.init) { this.line(1, 'static ' + typeName(t) + ' ' + nm + ';'); continue; }
+        if (it.init.k === 'arr') {
+          this.line(1, 'static ' + typeName(t) + ' ' + nm + ' = {' + it.init.items.map(a => this.ex(a, 0)).join(', ') + '};');
+        } else {
+          this.line(1, 'static ' + this.assignText(typeName(t) + ' ' + nm, t, it.init) + ';');
+        }
+      }
+    }
+    const globals = this.out;
+
+    /* 関数 */
+    this.out = [];
+    for (const name of Object.keys(P.functions)) {
+      const fn = P.functions[name];
+      const sig = this.idx.funcSig.get(name) || { retDims: 0, params: [] };
+      const ret = this.funcRet.get(name);
+      this.scopes.push(new Map());
+      const ps = fn.params.map((p, i) => {
+        const t = ty(baseOf(p.type, fn.line), sig.params[i] === undefined ? (p.isArray ? 1 : 0) : sig.params[i]);
+        this.declare(p.name, t);
+        return typeName(t) + ' ' + this.name(p.name, fn.line);
+      }).join(', ');
+      const retName = ret.b === 'void' ? 'void' : typeName(ret);
+      this.line(1, `static ${retName} ${this.name(name, fn.line)}(${ps}) {`);
+      this.emitBody(fn.body, 2, ret);
+      this.line(1, '}');
+      this.line(1, '');
+      this.scopes.pop();
+    }
+    const funcs = this.out;
+
+    /* main */
+    this.out = [];
+    this.line(1, 'public static void main(String[] args) {');
+    this.scopes.push(new Map());
+    if (P.main.length) {
+      this.emitBody(P.main, 2, UNK);
+    } else if (this.entryCall) {
+      const node = PseudoLang.parse(this.entryCall).main[0];
+      const call = node && (node.k === 'call' ? node.expr : node.expr);
+      this.hoisted = new Set();
+      const fnName = call && call.k === 'call' ? call.name : null;
+      const ret = fnName ? this.funcRet.get(fnName) : null;
+      if (ret && ret.b !== 'void') this.line(2, 'System.out.println(' + this.ex(call, 0) + ');');
+      else this.line(2, this.ex(call, 0) + ';');
+    } else {
+      this.line(2, '// 呼び出す処理がありません。ここに呼び出しを書いてください');
+    }
+    this.scopes.pop();
+    this.line(1, '}');
+    const mainBody = this.out;
+
+    /* ヘルパー */
+    this.out = [];
+    for (const [elemType, fn] of this.helpers) {
+      this.line(1, '');
+      this.line(1, `// 配列の末尾に 1 つ足した新しい配列を返す（Java の配列は長さを変えられないため）`);
+      this.line(1, `static ${elemType}[] ${fn}(${elemType}[] a, ${elemType} v) {`);
+      this.line(2, `${elemType}[] b = new ${elemType}[a.length + 1]${'[]'.repeat(0)};`);
+      this.line(2, 'for (int i = 0; i < a.length; i++) {');
+      this.line(3, 'b[i] = a[i];');
+      this.line(2, '}');
+      this.line(2, 'b[a.length] = v;');
+      this.line(2, 'return b;');
+      this.line(1, '}');
+    }
+    const helpers = this.out;
+    this.out = save;
+
+    const lines = [`public class ${this.className} {`];
+    if (globals.length) lines.push(...globals, '');
+    lines.push(...funcs, ...mainBody, ...helpers, '}');
+    if (this.usedShift) this.warn('擬似言語は配列が 1 始まり、Java は 0 始まりなので、要素番号を 1 引いています');
+    return lines.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '') + '\n';
+  }
+}
+
+function convert(pseudoSource, opts = {}) {
+  const src = String(pseudoSource || '');
+  if (!src.trim()) throw new PJError('コードが空です', 0);
+  let P;
+  try { P = PseudoLang.parse(src); }
+  catch (e) { throw new PJError('擬似言語として読めませんでした。' + PseudoLang.errorMessage(e), 0); }
+  const em = new Emitter(P, opts);
+  const code = em.run();
+  return { code, warnings: em.warnings, className: em.className };
+}
+
+function errorMessage(e) {
+  if (e instanceof PJError) return (e.line ? `行 ${e.line}: ` : '') + e.message;
+  if (e && e.name === 'PLError') return PseudoLang.errorMessage(e);
+  return '内部エラー: ' + (e && e.message ? e.message : String(e));
+}
+
+return { convert, errorMessage, PJError };
+})();
+</script>
+<script>
 (() => {
 'use strict';
 const STORAGE_KEY = 'traceTableEditor.v1';
@@ -1015,6 +2669,29 @@ const PSEUDO_SAMPLE_CODE = `○整数型: gcd(整数型: num1, 整数型: num2)
 function pseudoSampleDoc() {
   const d = newDoc('サンプル: 擬似言語 gcd(12, 18)', PSEUDO_SAMPLE_CODE);
   d.settings.entryCall = 'gcd(12, 18)';
+  return d;
+}
+
+const JAVA_SAMPLE_CODE = `public class Main {
+    // 配列の中で一番大きい値を返す
+    static int max(int[] a) {
+        int m = a[0];
+        for (int i = 1; i < a.length; i++) {
+            if (a[i] > m) {
+                m = a[i];
+            }
+        }
+        return m;
+    }
+
+    public static void main(String[] args) {
+        int[] data = {3, 9, 4, 1, 7};
+        System.out.println(max(data));
+    }
+}`;
+function javaSampleDoc() {
+  const d = newDoc('サンプル: Java の最大値', JAVA_SAMPLE_CODE);
+  d.settings.lang = 'java';
   return d;
 }
 
@@ -1106,6 +2783,7 @@ function renderDocSelect() {
 function codeLinesArr() { return cur().code.split('\n'); }
 
 function renderCode() {
+  closeLineEdit(true);
   const d = cur();
   const ta = $('#codeInput');
   if (ta.value !== d.code) ta.value = d.code;
@@ -1119,12 +2797,87 @@ function renderCode() {
     const li = document.createElement('li'); li.dataset.line = String(i + 1);
     const n = document.createElement('span'); n.className = 'ln'; n.textContent = i + 1;
     const c = document.createElement('code'); c.textContent = text || ' ';
-    li.append(n, c);
-    li.title = '行 ' + (i + 1) + ' のステップを追加';
-    li.addEventListener('click', () => addRow({ line: String(i + 1) }, null, 'firstVar'));
+    const add = document.createElement('button');
+    add.type = 'button'; add.className = 'ln-add'; add.textContent = '＋';
+    add.title = '行 ' + (i + 1) + ' のステップを表に追加';
+    li.append(n, c, add);
+    li.title = 'クリックするとこの行を書き換えられます';
     ol.appendChild(li);
   });
   updateActiveLine();
+}
+
+/* ---------- コード行をその場で書き換える ---------- */
+let lineEditor = null;
+
+function closeLineEdit(commit) {
+  if (!lineEditor) return;
+  const { ln, input } = lineEditor;
+  lineEditor = null;   // 先に外す（replaceWith で起きる blur の再入を防ぐ）
+  const d = cur();
+  const lines = d.code.split('\n');
+  let text = lines[ln - 1] ?? '';
+  if (commit && ln >= 1 && ln <= lines.length && lines[ln - 1] !== input.value) {
+    lines[ln - 1] = input.value;
+    d.code = lines.join('\n');
+    $('#codeInput').value = d.code;
+    text = input.value;
+    scheduleSave();
+    updateActiveLine();
+  }
+  const c = document.createElement('code');
+  c.textContent = text || ' ';
+  if (input.isConnected) input.replaceWith(c);
+}
+
+function startLineEdit(ln) {
+  closeLineEdit(true);
+  const li = $(`#codeLines li[data-line="${ln}"]`);
+  const code = li && li.querySelector('code');
+  if (!code) return;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'line-edit';
+  input.spellcheck = false;
+  input.setAttribute('aria-label', `行 ${ln} のコード`);
+  input.value = cur().code.split('\n')[ln - 1] ?? '';
+  input.addEventListener('blur', () => closeLineEdit(true));
+  input.addEventListener('keydown', e => {
+    const total = cur().code.split('\n').length;
+    const go = next => { closeLineEdit(true); if (next >= 1 && next <= total) startLineEdit(next); };
+    if (e.key === 'Escape') { e.preventDefault(); closeLineEdit(false); }
+    else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); closeLineEdit(true); insertCodeLine(ln); }
+    else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); go(e.shiftKey ? ln - 1 : ln + 1); }
+    else if (e.key === 'Backspace' && input.value === '' && total > 1) {
+      // 空行で Backspace ならその行を消して 1 つ上へ
+      e.preventDefault(); lineEditor = null; removeEmptyCodeLine(ln);
+    }
+  });
+  code.replaceWith(input);
+  lineEditor = { ln, input };
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
+function insertCodeLine(ln) {
+  const d = cur();
+  const lines = d.code.split('\n');
+  lines.splice(ln, 0, '');
+  d.code = lines.join('\n');
+  renderCode(); scheduleSave();
+  startLineEdit(ln + 1);
+}
+
+// 空になった行だけ消せるようにする（中身のある行を不用意に消さないため）
+function removeEmptyCodeLine(ln) {
+  const d = cur();
+  const lines = d.code.split('\n');
+  if (lines.length <= 1 || ln < 1 || ln > lines.length || lines[ln - 1].trim() !== '') return false;
+  lines.splice(ln - 1, 1);
+  d.code = lines.join('\n');
+  renderCode(); scheduleSave();
+  startLineEdit(Math.max(1, ln - 1));
+  return true;
 }
 
 function btn(label, title, onClick) {
@@ -1470,15 +3223,43 @@ function runOpts() {
   const st = docSettings(cur());
   return { arrayBase: st.arrayBase === 0 ? 0 : 1, condRows: st.condRows !== false, entryCall: st.entryCall || '', maxSteps: 5000 };
 }
+/* 変換のエラーと実行のエラーで出し分ける */
+function traceErrorMessage(e) {
+  if (e && e.name === 'JCError') return 'Java を擬似言語に直すところでつまずきました。\n' + JavaToPseudo.errorMessage(e);
+  return PseudoLang.errorMessage(e);
+}
+/* 実行の準備。Java のときは擬似言語に変換して動かし、行番号を Java の行へ戻す */
+function prepareRun() {
+  const d = cur(); const st = docSettings(d);
+  if (st.lang !== 'java') {
+    return { program: PseudoLang.parse(d.code), opts: runOpts(), mapLine: n => n, convWarnings: [] };
+  }
+  const conv = JavaToPseudo.convert(d.code);
+  const map = conv.lineMap || [];
+  return {
+    program: PseudoLang.parse(conv.code),
+    // Java は配列が 0 始まりで固定。条件判定の行にするかだけ設定を引き継ぐ
+    opts: { arrayBase: 0, condRows: st.condRows !== false, entryCall: (st.entryCall || '').trim(), maxSteps: 5000 },
+    mapLine: n => (n >= 1 && n <= map.length ? map[n - 1] : n),
+    convWarnings: conv.warnings || []
+  };
+}
+function mapError(e, mapLine) {
+  if (e && e.name === 'PLError' && e.line) return new PseudoLang.PLError(e.message, mapLine(e.line));
+  return e;
+}
 function runAuto() {
   const d = cur(); const steps = []; let error = null, result, warnings = [];
-  if (!d.code.trim()) return { steps, error: new Error('コードが空です'), warnings };
+  if (!d.code.trim()) return { steps, error: new PseudoLang.PLError('コードが空です', 0), warnings };
+  let ctx;
+  try { ctx = prepareRun(); }
+  catch (e) { return { steps, error: e, warnings }; }
+  warnings = ctx.convWarnings.slice();
   try {
-    const program = PseudoLang.parse(d.code);
-    const gen = PseudoLang.run(program, runOpts());
-    let r; while (!(r = gen.next()).done) steps.push(r.value);
-    result = r.value.result; warnings = r.value.warnings || [];
-  } catch (e) { error = e; }
+    const gen = PseudoLang.run(ctx.program, ctx.opts);
+    let r; while (!(r = gen.next()).done) steps.push({ ...r.value, line: ctx.mapLine(r.value.line) });
+    result = r.value.result; warnings = warnings.concat(r.value.warnings || []);
+  } catch (e) { error = mapError(e, ctx.mapLine); }
   return { steps, error, result, warnings };
 }
 function stepsColumnNames(steps) {
@@ -1505,14 +3286,14 @@ function summaryText(res) {
 }
 function doAutoTrace() {
   const d = cur(); const res = runAuto();
-  if (res.error && !res.steps.length) { showAutoMsg(PseudoLang.errorMessage(res.error), true); return; }
+  if (res.error && !res.steps.length) { showAutoMsg(traceErrorMessage(res.error), true); return; }
   pushUndo();
   ensureVarColumns(stepsColumnNames(res.steps));
   d.rows = res.steps.map(rowFromStep);
   activeRow = -1; renderVars(); renderTable(); scheduleSave();
   let msg = `${res.steps.length} 行を生成しました`;
   const extra = summaryText(res); if (extra) msg += '\n' + extra;
-  if (res.error) { msg = PseudoLang.errorMessage(res.error) + `\n（エラーまでの ${res.steps.length} 行を表にしました）`; showAutoMsg(msg, true); }
+  if (res.error) { msg = traceErrorMessage(res.error) + `\n（エラーまでの ${res.steps.length} 行を表にしました）`; showAutoMsg(msg, true); }
   else showAutoMsg(msg, false);
   toast(res.error ? 'エラーで停止しました' : '自動トレースを表に反映しました');
 }
@@ -1544,7 +3325,7 @@ function doCheck() {
   const d = cur();
   if (!d.rows.length) { showAutoMsg('表に行がありません。先に自分でトレースを記入してください', true); return; }
   const res = runAuto();
-  if (res.error && !res.steps.length) { showAutoMsg(PseudoLang.errorMessage(res.error), true); return; }
+  if (res.error && !res.steps.length) { showAutoMsg(traceErrorMessage(res.error), true); return; }
   clearMarks();
   const steps = res.steps;
   const manualLines = d.rows.map(r => normCell(r.line));
@@ -1572,7 +3353,7 @@ function doCheck() {
   if (extra) lines.push(`自動トレースに対応する行がない表の行: ${extra} 行（番号欄が赤）`);
   if (missing.length) lines.push(`表に無い自動トレースの行: ${missing.length} 行（行 ${missing.slice(0, 10).join(', ')}${missing.length > 10 ? ' …' : ''}）`);
   if (unknownCols.length) lines.push(`自動トレースに無い列（比較対象外）: ${unknownCols.join(', ')}`);
-  if (res.error) lines.push('自動トレースはエラーで停止: ' + PseudoLang.errorMessage(res.error));
+  if (res.error) lines.push('自動トレースはエラーで停止: ' + traceErrorMessage(res.error));
   const extraText = summaryText(res); if (extraText) lines.push(extraText);
   showAutoMsg(lines.join('\n'), ng > 0 || extra > 0 || missing.length > 0);
   toast(ng === 0 && !extra && !missing.length ? '全て一致しました' : '違いがあります');
@@ -1593,10 +3374,10 @@ function setExecLine(ln) {
 function stepStart() {
   const d = cur();
   if (!d.code.trim()) { showAutoMsg('コードが空です', true); return; }
-  try {
-    const program = PseudoLang.parse(d.code);
-    stepper = { gen: PseudoLang.run(program, runOpts()), prev: null, cur: null, done: false, outs: [], result: undefined, error: null };
-  } catch (e) { showAutoMsg(PseudoLang.errorMessage(e), true); return; }
+  let ctx;
+  try { ctx = prepareRun(); }
+  catch (e) { showAutoMsg(traceErrorMessage(e), true); return; }
+  stepper = { gen: PseudoLang.run(ctx.program, ctx.opts), mapLine: ctx.mapLine, prev: null, cur: null, done: false, outs: [], result: undefined, error: null };
   hideAutoMsg();
   $('#stepPanel').hidden = false;
   stepNext();
@@ -1606,8 +3387,8 @@ function stepNext() {
   try {
     const r = stepper.gen.next();
     if (r.done) { stepper.done = true; stepper.result = r.value; }
-    else { stepper.prev = stepper.cur; stepper.cur = r.value; if (r.value.out) stepper.outs.push(r.value.out); }
-  } catch (e) { stepper.done = true; stepper.error = e; }
+    else { stepper.prev = stepper.cur; stepper.cur = { ...r.value, line: stepper.mapLine(r.value.line) }; if (r.value.out) stepper.outs.push(r.value.out); }
+  } catch (e) { stepper.done = true; stepper.error = mapError(e, stepper.mapLine); }
   renderStep();
 }
 function stepToEnd() { let guard = 0; while (stepper && !stepper.done && guard++ < 6000) stepNext(); }
@@ -1632,7 +3413,7 @@ function renderStep() {
   $('#stepOut').textContent = stepper.outs.join(' ');
   let note = st ? st.note : '';
   if (stepper.done) {
-    if (stepper.error) note = (note ? note + '　' : '') + 'エラー: ' + PseudoLang.errorMessage(stepper.error);
+    if (stepper.error) note = (note ? note + '　' : '') + 'エラー: ' + traceErrorMessage(stepper.error);
     else {
       note = (note ? note + '　' : '') + '実行終了';
       const res = stepper.result || {};
@@ -1655,6 +3436,101 @@ function loadPseudoExample() {
   save(); const d = pseudoSampleDoc(); state.docs.push(d); switchDoc(d.id); save();
   toast('例を開きました。「自動トレース」を押してみてください');
 }
+function loadJavaExample() {
+  save(); const d = javaSampleDoc(); state.docs.push(d); switchDoc(d.id); save();
+  toast('Java の例を開きました。「自動トレース」を押してみてください');
+}
+
+/* ---------- Java ⇔ 擬似言語 の相互変換 ---------- */
+let convertResult = null;
+let convertMode = 'j2p';   // 'j2p' = Java→擬似言語 / 'p2j' = 擬似言語→Java
+
+// 言語の選択に合わせて、変換ボタンの向きと配列の先頭番号を切り替える
+function updateConvertButton() {
+  const st = docSettings(cur());
+  const isJava = st.lang === 'java';
+  const b = $('#btnConvert');
+  b.textContent = isJava ? '擬似言語に変換' : 'Java に変換';
+  b.title = isJava ? 'Java のコードを擬似言語に書き換える' : '擬似言語のコードを Java に書き換える';
+  const ab = $('#arrayBase');
+  ab.disabled = isJava;
+  ab.title = isJava ? 'Java の配列は 0 始まりで固定です' : '';
+  ab.value = isJava ? '0' : String(st.arrayBase === 0 ? 0 : 1);
+}
+function showConvertDialog(notes, title) {
+  hideAutoMsg();
+  $('#convertTitle').textContent = title;
+  $('#convertText').value = convertResult.code;
+  const msg = $('#convertMsg');
+  msg.textContent = notes.length ? '注意:\n・' + notes.join('\n・') : '変換できました。';
+  msg.hidden = false;
+  msg.classList.remove('error');
+  $('#dlgConvert').showModal();
+}
+function doConvert() {
+  const d = cur();
+  if (!d.code.trim()) { showAutoMsg('コードが空です', true); return; }
+  if (docSettings(d).lang === 'java') return convertJavaToPseudo(d);
+  return convertPseudoToJava(d);
+}
+function convertJavaToPseudo(d) {
+  let r;
+  try { r = JavaToPseudo.convert(d.code); }
+  catch (e) { convertResult = null; showAutoMsg(JavaToPseudo.errorMessage(e), true); toast('変換できませんでした'); return; }
+  convertResult = r; convertMode = 'j2p';
+  const notes = [];
+  if (r.usesArray) notes.push('配列を使っているので、反映するときに「配列の先頭番号」を 0 にします（Java に合わせるため）');
+  if (!r.hasMain && r.entryHint) notes.push(`main がないので、反映するときに「呼び出し式」を ${r.entryHint} にします。引数は自分で書き換えてください`);
+  notes.push(...r.warnings);
+  if (!notes.length) notes.push('変換できました。反映してから「自動トレース」を押せます。');
+  showConvertDialog(notes, 'Java から擬似言語への変換');
+}
+function convertPseudoToJava(d) {
+  const st = docSettings(d);
+  let r;
+  try {
+    r = PseudoToJava.convert(d.code, {
+      arrayBase: st.arrayBase === 0 ? 0 : 1,
+      entryCall: st.entryCall || '',
+      className: 'Main'
+    });
+  } catch (e) { convertResult = null; showAutoMsg(PseudoToJava.errorMessage(e), true); toast('変換できませんでした'); return; }
+  convertResult = r; convertMode = 'p2j';
+  const notes = r.warnings.slice();
+  notes.push('そのまま Main.java として保存すればコンパイルできます。');
+  showConvertDialog(notes, '擬似言語から Java への変換');
+}
+function applyConvertedSettings(d) {
+  const st = docSettings(d);
+  if (convertMode === 'p2j') { st.lang = 'java'; return; }
+  st.lang = 'pseudo';
+  if (convertResult.usesArray) st.arrayBase = 0;
+  if (!convertResult.hasMain && convertResult.entryHint && !st.entryCall) st.entryCall = convertResult.entryHint;
+}
+function convertToNewDoc() {
+  if (!convertResult) return;
+  save();
+  const base = (cur().title || '').trim() || (convertMode === 'p2j' ? '擬似言語' : 'Java');
+  const d = newDoc(base + (convertMode === 'p2j' ? '（Java）' : '（擬似言語）'), convertResult.code);
+  applyConvertedSettings(d);
+  state.docs.push(d); switchDoc(d.id); save();
+  $('#dlgConvert').close();
+  toast(convertMode === 'p2j' ? 'Java を新しい表として開きました' : '新しい表として開きました。「自動トレース」を押せます');
+}
+function convertReplace() {
+  if (!convertResult) return;
+  const d = cur();
+  d.code = convertResult.code;
+  applyConvertedSettings(d);
+  const st = docSettings(d);
+  $('#lang').value = st.lang;
+  $('#arrayBase').value = String(st.arrayBase === 0 ? 0 : 1);
+  $('#entryCall').value = st.entryCall || '';
+  updateConvertButton();
+  renderCode(); scheduleSave();
+  $('#dlgConvert').close();
+  toast(convertMode === 'p2j' ? 'Java に置き換えました' : '擬似言語に置き換えました。「自動トレース」を押せます');
+}
 
 /* ---------- 文書の切り替え ---------- */
 function switchDoc(id) {
@@ -1665,6 +3541,7 @@ function switchDoc(id) {
   $('#arrayBase').value = String(st.arrayBase === 0 ? 0 : 1);
   $('#condRows').checked = st.condRows !== false;
   $('#entryCall').value = st.entryCall || '';
+  updateConvertButton();
   renderAll();
   const ta = $('#codeInput');
   ta.hidden = cur().code.trim() !== '';
@@ -1734,6 +3611,22 @@ function bind() {
     if (!ta.hidden) ta.focus();
   });
   $('#extractVars').addEventListener('click', extractVars);
+
+  // コード行: クリックでその場編集、＋ でその行のステップを表に追加
+  const ol = $('#codeLines');
+  ol.addEventListener('mousedown', e => {
+    if (e.target.closest('button.ln-add') || e.target.closest('input.line-edit')) return;
+    const li = e.target.closest('li[data-line]');
+    if (!li) return;
+    e.preventDefault();   // 既存の入力欄からフォーカスが逃げる前に自分で差し替える
+    startLineEdit(+li.dataset.line);
+  });
+  ol.addEventListener('click', e => {
+    const b = e.target.closest('button.ln-add');
+    if (!b) return;
+    const li = b.closest('li[data-line]');
+    if (li) addRow({ line: li.dataset.line }, null, 'firstVar');
+  });
 
   // 変数
   const nv = $('#newVar');
@@ -1828,7 +3721,7 @@ function bind() {
 
   // 自動トレース
   const st = () => docSettings(cur());
-  $('#lang').addEventListener('change', e => { st().lang = e.target.value; scheduleSave(); });
+  $('#lang').addEventListener('change', e => { st().lang = e.target.value; updateConvertButton(); scheduleSave(); });
   $('#arrayBase').addEventListener('change', e => { st().arrayBase = +e.target.value; scheduleSave(); });
   $('#condRows').addEventListener('change', e => { st().condRows = e.target.checked; scheduleSave(); });
   $('#entryCall').addEventListener('input', e => { st().entryCall = e.target.value; scheduleSave(); });
@@ -1843,6 +3736,15 @@ function bind() {
   $('#stepAddRow').addEventListener('click', stepAddRow);
   $('#stepStop').addEventListener('click', stepStop);
   $('#loadExample').addEventListener('click', loadPseudoExample);
+  $('#loadJavaExample').addEventListener('click', loadJavaExample);
+
+  // Java → 擬似言語
+  const dlgC = $('#dlgConvert');
+  $('#btnConvert').addEventListener('click', doConvert);
+  $('#convertNew').addEventListener('click', convertToNewDoc);
+  $('#convertApply').addEventListener('click', e => armConfirm(e.currentTarget, 'convert', 'コードを置き換え', convertReplace));
+  $('#convertCopy').addEventListener('click', () => copyText($('#convertText').value, $('#convertText')));
+  $('#convertClose').addEventListener('click', () => dlgC.close());
 
   $('#btnPrint').addEventListener('click', () => { save(); window.print(); });
   $('#btnTheme').addEventListener('click', () => {
