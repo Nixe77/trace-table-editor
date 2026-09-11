@@ -26,7 +26,7 @@
 - 描画: `renderCode`（行番号付きコード。行クリックでその場編集、右端の `.ln-add` でステップ追加）
 - コード行のその場編集: `startLineEdit` / `closeLineEdit` / `insertCodeLine` / `removeEmptyCodeLine`。編集中の状態は `lineEditor` 1 個だけ。**`closeLineEdit` は先に `lineEditor = null` してから DOM を差し替える**（`replaceWith` で blur が飛んで再入するため）。クリックの受け口は `#codeLines` への委譲（`mousedown`）で、要素ごとにリスナを付けない（再描画で外れるため）。`renderCode` は先頭で `closeLineEdit(true)` を呼んで編集中の内容を取りこぼさない/ `renderVars`（変数チップ）/ `renderTable`（表。セル編集は再描画せず state だけ更新）
 - 行・列の操作: `addRow` / `deleteRow` / `moveRow` / `addVars` / `removeVar` / `moveVar` / `pushUndo` / `undo`（表の構造変更に加えて `code` も undo 対象。コードを書き換える処理は必ず `pushUndo()` を呼ぶこと）
-- エラー表示: `showAutoMsg(text, isError, line)` が見出し・本文・該当行の中身を組み立て、`setErrorLine()` でコード側の行も赤くする。`errorLineOf(e)` で `JCError` / `PLError` の行番号を取り出して渡す。`renderCode` は `errorLine` を見て印を貼り直す
+- エラー表示: `showTraceError(res)` が実行エラーの出し口。呼び出し式が要るときは `entrySuggestion` で関数名と引数の例を作り、`applyEntryCall` で欄に入れて引数部分を選択状態にする。`showAutoMsg(text, isError, line, action)` が見出し・本文・該当行の中身・操作ボタンを組み立て、`setErrorLine()` でコード側の行も赤くする。`errorLineOf(e)` で `JCError` / `PLError` の行番号を取り出して渡す。`renderCode` は `errorLine` を見て印を貼り直す
 - 変数抽出: `extractVarNames`（Java の型付き宣言、擬似言語の `整数型: x`、Python 風代入）
 - 入出力: `buildMarkdown` / `buildTSV` / `buildCSV` / `buildJSON` / `importJSON`
 - 補助: `switchDoc` / `armConfirm`（2 回押しで確定する破壊的操作の確認）/ `toast`

@@ -183,6 +183,9 @@ input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px}
 .automsg .amsg-body{white-space:pre-wrap;font-weight:400;margin-top:2px}
 .automsg .amsg-line{display:block;margin-top:8px;font-family:var(--mono);font-size:12px;white-space:pre;overflow-x:auto;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:var(--r-sm);padding:5px 9px}
 .automsg .amsg-line b{color:var(--danger)}
+.automsg .amsg-act{margin-top:10px}
+.automsg .amsg-act button{font-family:var(--mono)}
+#entryCall.needs-input{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .steppanel{border:1px solid var(--accent);border-radius:var(--r);padding:10px 12px;margin:10px 0 0;background:var(--accent-soft);box-shadow:var(--sh-1)}
 .steprow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0}
 .steprow code{font-family:var(--mono);white-space:pre;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -3317,7 +3320,7 @@ function setErrorLine(ln) {
 }
 function errorLineOf(e) { return e && typeof e.line === 'number' && e.line > 0 ? e.line : 0; }
 
-function showAutoMsg(text, isError, line = 0) {
+function showAutoMsg(text, isError, line = 0, action = null) {
   const el = $('#autoMsg');
   el.innerHTML = '';
   el.classList.toggle('error', !!isError);
@@ -3340,8 +3343,55 @@ function showAutoMsg(text, isError, line = 0) {
     snip.append(b, document.createTextNode(lines[line - 1].trim() || '（空行）'));
     el.appendChild(snip);
   }
+  if (action) {
+    const wrap = document.createElement('div'); wrap.className = 'amsg-act';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'primary small';
+    b.textContent = action.label;
+    b.addEventListener('click', action.onClick);
+    wrap.appendChild(b);
+    el.appendChild(wrap);
+  }
   el.hidden = false;
   setErrorLine(isError ? line : 0);
+}
+
+/* 「呼び出し式」が要るときは、その場で入れられるようにする */
+const ARG_SAMPLE = {
+  '整数型': '3', '実数型': '1.5', '文字列型': '"abc"', '文字型': '"a"', '論理型': 'true',
+  '整数型[]': '{1, 2, 3}', '実数型[]': '{1.5, 2.5}', '文字列型[]': '{"a", "b"}', '文字型[]': '{"a", "b"}', '論理型[]': '{true, false}'
+};
+function sampleArg(p) { return ARG_SAMPLE[p.type + (p.isArray ? '[]' : '')] || (p.isArray ? '{1, 2, 3}' : '0'); }
+function entrySuggestion(res) {
+  const P = res && res.program;
+  if (!P || !P.functions) return null;
+  const names = Object.keys(P.functions);
+  if (!names.length) return null;
+  const fn = P.functions[names[0]];
+  return {
+    name: fn.name,
+    signature: `${fn.name}(${fn.params.map(p => `${p.type}${p.isArray ? 'の配列' : ''}: ${p.name}`).join(', ')})`,
+    call: `${fn.name}(${fn.params.map(sampleArg).join(', ')})`
+  };
+}
+function applyEntryCall(text, selectArgs) {
+  const inp = $('#entryCall');
+  inp.value = text;
+  docSettings(cur()).entryCall = text;
+  scheduleSave();
+  inp.focus();
+  const open = text.indexOf('('), close = text.lastIndexOf(')');
+  if (selectArgs && open >= 0 && close > open + 1) inp.setSelectionRange(open + 1, close);
+  else inp.setSelectionRange(text.length, text.length);
+  inp.classList.add('needs-input');
+  setTimeout(() => inp.classList.remove('needs-input'), 2000);
+}
+/* 実行エラーを表示する。呼び出し式が足りないときは入力を手伝う */
+function showTraceError(res, extraText) {
+  const msg = traceErrorMessage(res.error) + (extraText || '');
+  const sug = /呼び出し式/.test(msg) ? entrySuggestion(res) : null;
+  if (!sug) { showAutoMsg(msg, true, errorLineOf(res.error)); return; }
+  const text = `実行したい関数と引数を「呼び出し式」欄に入れてください\n${sug.signature} を呼び出します。下のボタンで例を入れて、引数を書き換えてください。`;
+  showAutoMsg(text, true, 0, { label: `呼び出し式に ${sug.call} を入れる`, onClick: () => applyEntryCall(sug.call, true) });
 }
 function hideAutoMsg() { const el = $('#autoMsg'); el.hidden = true; el.innerHTML = ''; setErrorLine(0); }
 function runOpts() {
@@ -3385,7 +3435,7 @@ function runAuto() {
     let r; while (!(r = gen.next()).done) steps.push({ ...r.value, line: ctx.mapLine(r.value.line) });
     result = r.value.result; warnings = warnings.concat(r.value.warnings || []);
   } catch (e) { error = mapError(e, ctx.mapLine); }
-  return { steps, error, result, warnings };
+  return { steps, error, result, warnings, program: ctx.program };
 }
 function stepsColumnNames(steps) {
   const names = [];
@@ -3411,7 +3461,7 @@ function summaryText(res) {
 }
 function doAutoTrace() {
   const d = cur(); const res = runAuto();
-  if (res.error && !res.steps.length) { showAutoMsg(traceErrorMessage(res.error), true, errorLineOf(res.error)); return; }
+  if (res.error && !res.steps.length) { showTraceError(res); return; }
   pushUndo();
   ensureVarColumns(stepsColumnNames(res.steps));
   d.rows = res.steps.map(rowFromStep);
@@ -3450,7 +3500,7 @@ function doCheck() {
   const d = cur();
   if (!d.rows.length) { showAutoMsg('表に行がありません。先に自分でトレースを記入してください', true); return; }
   const res = runAuto();
-  if (res.error && !res.steps.length) { showAutoMsg(traceErrorMessage(res.error), true, errorLineOf(res.error)); return; }
+  if (res.error && !res.steps.length) { showTraceError(res); return; }
   clearMarks();
   const steps = res.steps;
   const manualLines = d.rows.map(r => normCell(r.line));
@@ -3502,6 +3552,9 @@ function stepStart() {
   let ctx;
   try { ctx = prepareRun(); }
   catch (e) { showAutoMsg(traceErrorMessage(e), true, errorLineOf(e)); return; }
+  // 呼び出し式が要るコードは、1 ステップ実行でも先に案内する
+  const probe = runAuto();
+  if (probe.error && !probe.steps.length) { showTraceError(probe); return; }
   stepper = { gen: PseudoLang.run(ctx.program, ctx.opts), mapLine: ctx.mapLine, prev: null, cur: null, done: false, outs: [], result: undefined, error: null };
   hideAutoMsg();
   $('#stepPanel').hidden = false;
